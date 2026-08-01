@@ -26,7 +26,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T08 | done | 78ac4df | check ✅ | `rom_probe.py` + `preprocess_rom.py`: ROM layout probe, git pinning, cpp harness |
 | M1-T08b | done | 7e74720 | check ✅ | `preprocess_rom.py`: route repo resolution through environment & preflight check exit 3 |
 | M1-T08c | done | 9abb6e8 | check ✅ | `environment.py` + `preprocess_rom.py`: scope preprocess preflight, git-optional pinning |
-| M1-T08d | done | e651752 | check ✅ | `files_within_allowlist.py`: enforce card allowlist, derivable manifest count |
+| M1-T08d | done | 0e999bc | check ✅ | `files_within_allowlist.py`: enforce card allowlist, derivable manifest count |
 | M1-T09 | done | 15feb07 | check ✅ | `cparse.py`: designated-initializer C parser |
 | M1-T10 | todo | — | — | `ingest/rom_config.py`: config-header reader (`B_*`, `P_*`, limits, AI flags) |
 | M1-T11 | todo | — | — | `ingest/extract/species.py`: species and forms extractor |
