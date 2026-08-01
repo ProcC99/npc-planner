@@ -286,7 +286,7 @@ def test_23_national_dex_resolution(fake_rom_layout: object) -> None:
     gen9 = by_id["SPECIES_GEN9_GUARD"]
 
     assert skarmory.national_dex is None
-    assert "natDexNum" in skarmory.unparsed_fields
+    assert "natDexNum=NATIONAL_DEX_SKARMORY" in skarmory.unparsed_fields
     assert gen9.national_dex == 999
 
 

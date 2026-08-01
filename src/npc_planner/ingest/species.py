@@ -144,7 +144,7 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
                 national_dex = int(raw_dex)
             else:
                 national_dex = None
-                extra_unparsed.append("natDexNum")
+                extra_unparsed.append(f"natDexNum={raw_dex}")
 
         # Validate base stats
         stat_names = (
@@ -279,7 +279,9 @@ def audit_species_coverage(
     unparsed_fields. Empty means genuinely total coverage.
     """
     raw_keys_in_text: set[str] = set(re.findall(r"\.([A-Za-z0-9_]+)\s*=", text))
-    unparsed_in_records: set[str] = {k for r in records for k in r.unparsed_fields}
+    unparsed_in_records: set[str] = {
+        k.split("=")[0] for r in records for k in r.unparsed_fields
+    }
 
     accounted = MAPPED_FIELDS | IGNORED_FIELDS | unparsed_in_records
     unaccounted = raw_keys_in_text - accounted
