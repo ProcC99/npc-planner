@@ -2,9 +2,16 @@
 import argparse
 import hashlib
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 
+from npc_planner.environment import (
+    RomRepoNotFoundError,
+    resolve_rom_repo,
+    run_all,
+)
 from npc_planner.ingest.rom_probe import probe_layout, read_pin
 
 
@@ -21,7 +28,10 @@ def main() -> None:
         description="Run C preprocessor over ROM headers and generate ROM_MANIFEST.json."
     )
     parser.add_argument(
-        "--repo", required=True, type=Path, help="Path to expansion repo tree."
+        "--repo",
+        type=Path,
+        default=None,
+        help="Path to expansion repo tree (optional; resolved via environment).",
     )
     parser.add_argument(
         "--output",
@@ -34,7 +44,27 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    repo = args.repo.resolve()
+    try:
+        repo = resolve_rom_repo(explicit=args.repo, env=dict(os.environ))
+    except RomRepoNotFoundError as e:
+        print(f"[FAIL] ROM Repo Resolution Error:\n{e}", file=sys.stderr)
+        sys.exit(2)
+
+    # Preflight doctor check
+    results = run_all(repo, cpp=args.cpp)
+    hard_failures = [r for r in results if r.severity == "hard" and not r.ok]
+
+    if hard_failures:
+        print(
+            f"[FAIL] Preflight doctor check failed for '{repo}' ({len(hard_failures)} hard failure(s)):",
+            file=sys.stderr,
+        )
+        for r in hard_failures:
+            print(f"  - {r.name}: {r.detail}", file=sys.stderr)
+            if r.remedy:
+                print(f"    Remedy: {r.remedy}", file=sys.stderr)
+        sys.exit(3)
+
     output_dir = args.output.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
