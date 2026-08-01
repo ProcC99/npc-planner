@@ -488,8 +488,11 @@ Every non-merge commit must carry exactly one recognised scope tag in its subjec
 | `[M<n>-T<id>]` | Task work | The card's allowlist, plus `docs/LEDGER.md` |
 | `[ledger]` | Ledger bookkeeping only | `docs/LEDGER.md` |
 | `[protocol]` | Protocol and card text only | `EXECUTION_PROTOCOL.md`, `docs/PROTOCOL_AMENDMENT_*.md`, `docs/tasks/*.md` |
+| `[ci]` | CI mechanism only | `.pre-commit-config.yaml`, `Makefile`, `.github/` |
 
 Enforced by `scripts/hooks/task_id_required.py` and `scripts/hooks/files_within_allowlist.py` at the `commit-msg` stage.
+
+A task tag may only be used while that task is open. Once `docs/LEDGER.md` records the task as `done` with a commit sha, further commits carrying that tag are rejected. Follow-up work needs a new lettered card.
 
 ### 11.8 Staged files must fall within the card's allowlist
 
@@ -525,6 +528,10 @@ gate:
 ```
 
 Note `ruff format --check` and `ruff check` with no `--fix`. Edit until `make gate` is green, then `git add`, then commit once. If you have amended more than twice, stop and report instead of continuing.
+
+### 11.11 CI scope
+
+Changes to CI mechanism files - `.pre-commit-config.yaml`, `Makefile`, `.github/` - are tagged `[ci]`. A `[ci]` commit must touch only those paths and must add a dated line to `docs/LEDGER.md` naming what changed and why. `.pre-commit-config.yaml` is **not** part of `[protocol]` scope: a protocol commit edits the rules as written, never the machinery that enforces them.
 
 ---
 
