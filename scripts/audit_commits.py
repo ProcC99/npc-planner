@@ -52,6 +52,7 @@ PROTOCOL_SCOPE = (
     "EXECUTION_PROTOCOL.md",
     "docs/PROTOCOL_AMENDMENT_*.md",
     "docs/tasks/*.md",
+    ".pre-commit-config.yaml",
 )
 
 

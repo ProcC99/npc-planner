@@ -424,6 +424,8 @@ git checkout -b task/M1-T08d
 
 Card immutability cannot be enforced against a file git has never seen, and a card that is never committed is not part of the project's history at all.
 
+The commit that adds a task card carries `[protocol]`, never the task's own tag. A task-tagged commit has its allowlist read from the card in `HEAD`, so it cannot be the commit that introduces that card.
+
 ### 11.2 Must-pass sections are preserved verbatim
 
 The Goal, Contract, Must-pass tests, Out of scope, Acceptance command, and Definition of Done sections are load-bearing. None may be shortened, summarised, merged, or reflowed by the agent.
