@@ -29,7 +29,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T08d | done | 0e999bc | check ✅ | `files_within_allowlist.py`: enforce card allowlist, derivable manifest count |
 | M1-T08e | done | ef6e0c6 | check ✅ | `task_id_required.py` + `files_within_allowlist.py`: close untagged loophole, make gate, history audit |
 | M1-T09 | done | 15feb07 | check ✅ | `cparse.py`: designated-initializer C parser |
-| M1-T10 | todo | — | — | `ingest/rom_config.py`: config-header reader (`B_*`, `P_*`, limits, AI flags) |
+| M1-T10 | done | 1487f98 | check ✅ | `ingest/rom_config.py`: config-header reader (`B_*`, `P_*`, limits, AI flags) |
 | M1-T11 | todo | — | — | `ingest/extract/species.py`: species and forms extractor |
 | M1-T12 | todo | — | — | `ingest/extract/moves.py`: moves extractor |
 | M1-T13 | todo | — | — | `ingest/extract/abilities.py`: abilities extractor |
