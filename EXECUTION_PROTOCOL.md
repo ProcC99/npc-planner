@@ -144,6 +144,7 @@ Gate:  make check green
 - **Never commit red** to a task branch except as an explicit `wip:` commit that will be squashed away.
 - **Never amend or force-push** a commit that has been merged into a milestone branch.
 - **Never squash a milestone branch into a single commit at merge.** The per-task history is the audit trail; it is how a human bisects the model's mistakes.
+- **Ledger sha recording.** The ledger records the **milestone-branch** sha produced by the squash merge, never the task-branch sha. Task branches are deleted and their commits garbage-collected; a ledger pointing at them decays into dead references.
 
 ### Tags
 
@@ -390,22 +391,7 @@ You are implementing ONE task from a task card. Rules:
 
 ---
 
-## Appendix A — Task Count Estimate
-
-| Milestone | Tasks | Rationale |
-|---|---|---|
-| M1 | 6 | schema, session, envelope, fetch script, baseline load, provenance |
-| M2 | 4 | overlay parse, precedence merge, diff, build orchestration |
-| M3 | 6 | 3 ruleset files, resolver, context, legality ×2, explain CLI |
-| M4 | 6 | type matrix, defense, coverage, roles, move pool, synthesizer |
-| M5 | 8 | 4 config files, 2 scorers, difficulty, player_resources, counterplay |
-| M6 | 9 | pool, search, local search, variants, pipeline, 3 exporters, test suites |
-
-**≈ 39 tasks.** If any milestone's task list comes out under half these numbers, the tasks are too big for the model executing them.
-
----
-
-## 11. Execution Protocol — Amendment 11
+## 11. Execution Protocol — Amendment 11 (Rev 2)
 
 Effective from `M1-T08c` onward.
 
@@ -425,6 +411,17 @@ If a card is wrong, the only legal responses are:
 2. Continue, and record the discrepancy in the commit body.
 
 A follow-up card corrects the original. Cards are never edited in place by the agent that runs them. The human author may edit any card at any time.
+
+**The task card is committed to the milestone branch before the task branch is created.**
+
+```bash
+git checkout milestone/M1
+git add docs/tasks/M1-T08d.md
+git commit -m "docs(tasks): add M1-T08d card"
+git checkout -b task/M1-T08d
+```
+
+Card immutability cannot be enforced against a file git has never seen, and a card that is never committed is not part of the project's history at all.
 
 ### 11.2 Must-pass sections are preserved verbatim
 
@@ -495,3 +492,27 @@ Add to `.pre-commit-config.yaml`:
         stages: [commit-msg]
 ```
 
+### 11.8 Staged files must fall within the card's allowlist
+
+A commit tagged `[M<n>-T<id>]` may stage only files matching the bullet list under **"Files you may create or modify"** in `docs/tasks/M<n>-T<id>.md`, plus `docs/LEDGER.md`.
+
+The allowlist is read from the card **as committed in HEAD**, never from the working tree. A card edited locally must not be able to widen its own allowlist for the commit being made.
+
+Work that does not fit belongs in a separate chore commit. Protocol scaffolding, hook installation, and documentation restructuring are chore work, not task work.
+
+Enforced by `scripts/hooks/files_within_allowlist.py` at the `commit-msg` stage.
+
+---
+
+## Appendix A — Task Count Estimate
+
+| Milestone | Tasks | Rationale |
+|---|---|---|
+| M1 | 6 | schema, session, envelope, fetch script, baseline load, provenance |
+| M2 | 4 | overlay parse, precedence merge, diff, build orchestration |
+| M3 | 6 | 3 ruleset files, resolver, context, legality ×2, explain CLI |
+| M4 | 6 | type matrix, defense, coverage, roles, move pool, synthesizer |
+| M5 | 8 | 4 config files, 2 scorers, difficulty, player_resources, counterplay |
+| M6 | 9 | pool, search, local search, variants, pipeline, 3 exporters, test suites |
+
+**≈ 39 tasks.** If any milestone's task list comes out under half these numbers, the tasks are too big for the model executing them.

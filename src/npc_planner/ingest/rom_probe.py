@@ -19,6 +19,20 @@ class RomPin:
     pinned: bool
 
 
+# RomLayout attributes that are C headers and therefore cpp-able.
+# wild_encounters_json is JSON and trainers is a .party file; neither is preprocessed.
+PREPROCESSABLE_FIELDS: tuple[str, ...] = (
+    "species_info",
+    "moves_info",
+    "abilities",
+    "types_info",
+    "items",
+    "level_up_learnsets",
+    "teachable_learnsets",
+    "egg_moves",
+)
+
+
 @dataclass(frozen=True)
 class RomLayout:
     layout_id: str
@@ -34,6 +48,20 @@ class RomLayout:
     wild_encounters: Path
     trainers: Path
     trainers_format: str  # "party" | "json"
+
+    def preprocessable_paths(self) -> list[Path]:
+        """De-duplicated paths for preprocessable C headers in this layout."""
+        targets = ("species_info", "moves_info", "abilities", "types_info", "items")
+        paths: list[Path] = []
+        for name in targets:
+            val = getattr(self, name)
+            if isinstance(val, (tuple, list)):
+                for p in val:
+                    if p not in paths:
+                        paths.append(p)
+            elif isinstance(val, Path) and val not in paths:
+                paths.append(val)
+        return paths
 
 
 def probe_layout(repo_path: Path) -> RomLayout:
