@@ -37,6 +37,11 @@ CI_SCOPE = (
     ".pre-commit-config.yaml",
     "Makefile",
     ".github/",
+    "scripts/hooks/*",
+    "scripts/accept/*",
+    "scripts/review_bundle.sh",
+    "scripts/audit_commits.py",
+    "docs/LEDGER.md",
 )
 
 

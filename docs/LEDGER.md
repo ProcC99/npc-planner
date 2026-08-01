@@ -69,3 +69,5 @@ Per Amendment 11, history is not rewritten; violations are recorded here for tra
 - `052b862`: untagged commit (`fixup! add M1-T08e card`)
 - `7d22d8f` (M1-T08e): tag reused after task recorded done in ledger (tag-shopping, not malice)
 - `737dc19` (M1-T08e): tag reused after task recorded done in ledger (tag-shopping, not malice)
+
+- 2026-08-01 [ci]: added `scripts/review_bundle.sh` and `review-bundle` Makefile target per M1-T11 Step 0b.

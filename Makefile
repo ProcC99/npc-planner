@@ -1,4 +1,8 @@
-.PHONY: lint typecheck schema-check test-unit test-int hooks-check check gate fresh golden-update hooks
+.PHONY: lint typecheck schema-check test-unit test-int hooks-check check gate fresh golden-update hooks review-bundle
+
+# ---- Bundle review artifacts ----
+review-bundle:
+	bash scripts/review_bundle.sh
 
 hooks-check:
 	python3 scripts/check_hooks_installed.py
