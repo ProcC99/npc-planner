@@ -25,7 +25,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T09 | done | bb88dc6 | check ✅ | `ingest/baseline.py`: disk-only load of raw dumps into `stg_*` |
 | M1-T10 | done | c34a0d8 | check ✅ | `ingest/provenance.py`: `record_field`, `entity_confidence`, `uncertainties` |
 | M1-T11 | done | 606b0c1 | check ✅ | `ingest/build.py`: orchestration + `planner.db.lock.json` |
-| M1-T12 | todo | — | — | `cli/main.py` stub + `data build` + `pokemon show` + smoke tests |
+| M1-T12 | done | dcf0995 | check ✅ | `cli/main.py` stub + `data build` + `pokemon show` + smoke tests |
 
 ## M2 — Overlay Engine & Baseline Diffing  → tag `m2-overlay`
 
