@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from npc_planner.ingest.cparse import (
+    CExpr,
     CMacroCall,
     CParseError,
     _clean_string_literal,
@@ -59,21 +60,41 @@ class SpeciesRecord:
     source_record: str
     unparsed_fields: tuple[str, ...]
     symbolic_fields: tuple[tuple[str, str], ...]
+    unevaluated_fields: tuple[tuple[str, str], ...]
     source_type: str = "rom_extract"
     confidence: float = 0.80
     raw_initializer_keys: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        keys = tuple(k for k, _ in self.symbolic_fields)
-        if keys != tuple(sorted(keys)):
+        sym_keys = tuple(k for k, _ in self.symbolic_fields)
+        if sym_keys != tuple(sorted(sym_keys)):
             raise SpeciesParseError("symbolic_fields must be sorted by key")
-        overlap = set(keys) & set(self.unparsed_fields)
-        if overlap:
-            raise SpeciesParseError(f"field in both sets: {sorted(overlap)}")
+        uneval_keys = tuple(k for k, _ in self.unevaluated_fields)
+        if uneval_keys != tuple(sorted(uneval_keys)):
+            raise SpeciesParseError("unevaluated_fields must be sorted by key")
+
+        # Three-way disjointness
+        all_sets = [
+            set(self.unparsed_fields),
+            set(sym_keys),
+            set(uneval_keys),
+        ]
+        for i, a in enumerate(all_sets):
+            for j, b in enumerate(all_sets):
+                if i < j:
+                    overlap = a & b
+                    if overlap:
+                        raise SpeciesParseError(
+                            f"field in multiple sets: {sorted(overlap)}"
+                        )
 
     @property
     def symbolic_map(self) -> dict[str, str]:
         return dict(self.symbolic_fields)
+
+    @property
+    def unevaluated_map(self) -> dict[str, str]:
+        return dict(self.unevaluated_fields)
 
 
 def _extract_types(val: object, key: str) -> tuple[str, ...]:
@@ -149,12 +170,16 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
         # Validate national_dex
         national_dex: int | None = None
         symbolic_list: list[tuple[str, str]] = []
+        unevaluated_list: list[tuple[str, str]] = []
         if "natDexNum" in fields:
             raw_dex = fields["natDexNum"]
             if isinstance(raw_dex, int):
                 national_dex = raw_dex
             elif isinstance(raw_dex, str) and raw_dex.isdigit():
                 national_dex = int(raw_dex)
+            elif isinstance(raw_dex, CExpr):
+                national_dex = None
+                unevaluated_list.append(("natDexNum", raw_dex.raw))
             else:
                 national_dex = None
                 symbolic_list.append(("natDexNum", str(raw_dex)))
@@ -228,6 +253,7 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
                 unparsed.add(k)
 
         symbolic_sorted = tuple(sorted(symbolic_list, key=lambda x: x[0]))
+        unevaluated_sorted = tuple(sorted(unevaluated_list, key=lambda x: x[0]))
 
         records.append(
             SpeciesRecord(
@@ -243,6 +269,7 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
                 source_record=key,
                 unparsed_fields=tuple(sorted(unparsed)),
                 symbolic_fields=symbolic_sorted,
+                unevaluated_fields=unevaluated_sorted,
                 source_type="rom_extract",
                 confidence=0.80,
                 raw_initializer_keys=raw_keys_tuple,
@@ -295,14 +322,22 @@ def audit_species_coverage(
     """Every `.identifier =` key appearing inside gSpeciesInfo[] in `text` that is not
 
     in MAPPED_FIELDS, not in IGNORED_FIELDS, and not recorded in any record's
-    unparsed_fields or symbolic_map. Empty means genuinely total coverage.
+    unparsed_fields, symbolic_map, or unevaluated_map. Empty means genuinely total
+    coverage.
     """
     raw_keys_in_text: set[str] = set(re.findall(r"\.([A-Za-z0-9_]+)\s*=", text))
     unparsed_in_records: set[str] = {k for r in records for k in r.unparsed_fields}
     symbolic_keys_in_records: set[str] = {k for r in records for k in r.symbolic_map}
+    unevaluated_keys_in_records: set[str] = {
+        k for r in records for k in r.unevaluated_map
+    }
 
     accounted = (
-        MAPPED_FIELDS | IGNORED_FIELDS | unparsed_in_records | symbolic_keys_in_records
+        MAPPED_FIELDS
+        | IGNORED_FIELDS
+        | unparsed_in_records
+        | symbolic_keys_in_records
+        | unevaluated_keys_in_records
     )
     unaccounted = raw_keys_in_text - accounted
     return tuple(sorted(unaccounted))

@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import Union
 
-CValue = Union[int, str, list["CValue"], dict[str, "CValue"], "CMacroCall"]
+CValue = Union[int, str, list["CValue"], dict[str, "CValue"], "CMacroCall", "CExpr"]
 
 
 class CParseError(ValueError):
@@ -17,6 +17,29 @@ class CMacroCall:
 
     name: str
     args: tuple[CValue, ...]
+
+
+_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_IDENT_FIND_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_STRING_LIT_RE = re.compile(r'"[^"]*"')
+
+
+@dataclass(frozen=True)
+class CExpr:
+    """An unevaluated C expression — multiple tokens, ternary, compound operator.
+
+    raw: the verbatim source text
+    identifiers: every identifier token, deduplicated and sorted.
+                 String literals are stripped before extraction.
+    """
+
+    raw: str
+    identifiers: tuple[str, ...]
+
+    @property
+    def is_constant(self) -> bool:
+        """True when the expression contains no identifiers (e.g. ``1 << 3``)."""
+        return not self.identifiers
 
 
 def _strip_comments_and_line_directives(text: str) -> str:
@@ -178,7 +201,14 @@ def _parse_c_value(text: str, start: int) -> tuple[CValue, int]:
     if token.startswith("-") and token[1:].isdigit():
         return int(token), i
 
-    return token, i
+    # Single identifier → str; anything else → CExpr
+    if _IDENT_RE.match(token):
+        return token, i
+
+    # Multi-token expression: strip string literals before extracting identifiers
+    stripped = _STRING_LIT_RE.sub("", token)
+    idents = tuple(sorted(set(_IDENT_FIND_RE.findall(stripped))))
+    return CExpr(raw=token, identifiers=idents), i
 
 
 def _parse_inner_braces(inner: str) -> dict[str, CValue] | list[CValue]:
@@ -217,6 +247,8 @@ def _parse_inner_braces(inner: str) -> dict[str, CValue] | list[CValue]:
     if field_matches:
         result_dict: dict[str, CValue] = {}
         for idx, (fname, _start_pos, val_start) in enumerate(field_matches):
+            if fname in result_dict:
+                raise CParseError(f"duplicate key '.{fname}' in initializer")
             if idx + 1 < len(field_matches):
                 val_end = field_matches[idx + 1][1]
             else:
