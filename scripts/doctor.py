@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -24,7 +25,7 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        repo_path = resolve_rom_repo(explicit=args.repo)
+        repo_path = resolve_rom_repo(explicit=args.repo, env=dict(os.environ))
     except RomRepoNotFoundError as e:
         print(f"[FAIL] Environment Resolution Error:\n{e}", file=sys.stderr)
         sys.exit(2)
