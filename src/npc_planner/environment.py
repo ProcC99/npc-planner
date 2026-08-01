@@ -1,4 +1,3 @@
-import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -8,6 +7,20 @@ from typing import Literal
 import yaml
 
 Severity = Literal["hard", "soft"]
+
+CHECK_SEVERITY: dict[str, Severity] = {
+    "cpp": "hard",
+    "repo_present": "hard",
+    "is_git_repo": "hard",
+    "expansion_markers": "hard",
+    "upstream_remote": "soft",
+    "tree_clean": "soft",
+}
+
+EXPANSION_MARKERS: tuple[str, ...] = (
+    "include/config/species_enabled.h",
+    "include/config/battle.h",
+)
 
 
 class RomRepoNotFoundError(RuntimeError):
@@ -42,7 +55,7 @@ def resolve_rom_repo(
         if p_exp.exists() and p_exp.is_dir():
             return p_exp
 
-    env_map = env if env is not None else dict(os.environ)
+    env_map = env if env is not None else {}
     if env_map.get("NPC_PLANNER_ROM_REPO"):
         p_env = Path(env_map["NPC_PLANNER_ROM_REPO"]).resolve()
         candidates.append(("env NPC_PLANNER_ROM_REPO", p_env))
@@ -83,18 +96,19 @@ def resolve_rom_repo(
 
 def check_cpp(cpp: str = "cpp") -> CheckResult:
     binary = shutil.which(cpp)
+    severity = CHECK_SEVERITY["cpp"]
     if binary:
         return CheckResult(
-            name="C preprocessor (cpp)",
+            name="cpp",
             ok=True,
-            severity="hard",
+            severity=severity,
             detail=f"Found C preprocessor at {binary}",
             remedy=None,
         )
     return CheckResult(
-        name="C preprocessor (cpp)",
+        name="cpp",
         ok=False,
-        severity="hard",
+        severity=severity,
         detail=f"C preprocessor '{cpp}' not found in PATH",
         remedy="Install GCC/Clang C preprocessor (e.g., 'sudo apt install build-essential' or 'gcc')",
     )
@@ -102,18 +116,19 @@ def check_cpp(cpp: str = "cpp") -> CheckResult:
 
 def check_repo_present(repo_path: Path) -> CheckResult:
     p = repo_path.resolve()
+    severity = CHECK_SEVERITY["repo_present"]
     if p.exists() and p.is_dir():
         return CheckResult(
-            name="ROM repo directory",
+            name="repo_present",
             ok=True,
-            severity="hard",
+            severity=severity,
             detail=f"Directory exists at {p}",
             remedy=None,
         )
     return CheckResult(
-        name="ROM repo directory",
+        name="repo_present",
         ok=False,
-        severity="hard",
+        severity=severity,
         detail=f"ROM repo directory '{p}' does not exist",
         remedy=f"Clone pokeemerald-expansion into '{p}'",
     )
@@ -121,11 +136,12 @@ def check_repo_present(repo_path: Path) -> CheckResult:
 
 def check_is_git_repo(repo_path: Path) -> CheckResult:
     p = repo_path.resolve()
+    severity = CHECK_SEVERITY["is_git_repo"]
     if (p / ".git").exists() or (p / "HEAD").exists():
         return CheckResult(
-            name="Git repository",
+            name="is_git_repo",
             ok=True,
-            severity="hard",
+            severity=severity,
             detail=f"Directory '{p}' is a valid Git repository",
             remedy=None,
         )
@@ -138,9 +154,9 @@ def check_is_git_repo(repo_path: Path) -> CheckResult:
         )
         if res.returncode == 0 and "true" in res.stdout.strip():
             return CheckResult(
-                name="Git repository",
+                name="is_git_repo",
                 ok=True,
-                severity="hard",
+                severity=severity,
                 detail=f"Directory '{p}' is inside a Git work tree",
                 remedy=None,
             )
@@ -148,9 +164,9 @@ def check_is_git_repo(repo_path: Path) -> CheckResult:
         pass
 
     return CheckResult(
-        name="Git repository",
+        name="is_git_repo",
         ok=False,
-        severity="hard",
+        severity=severity,
         detail=f"Directory '{p}' is not a Git repository",
         remedy=f"Run 'git init' inside '{p}' or clone a fresh repository",
     )
@@ -158,24 +174,20 @@ def check_is_git_repo(repo_path: Path) -> CheckResult:
 
 def check_expansion_markers(repo_path: Path) -> CheckResult:
     p = repo_path.resolve()
-    markers = [
-        p / "include/config/species_enabled.h",
-        p / "include/config/battle.h",
-        p / "include/config/pokemon.h",
-    ]
-    found = [m for m in markers if m.exists()]
+    severity = CHECK_SEVERITY["expansion_markers"]
+    found = [m for m in EXPANSION_MARKERS if (p / m).exists()]
     if found:
         return CheckResult(
-            name="pokeemerald-expansion markers",
+            name="expansion_markers",
             ok=True,
-            severity="hard",
+            severity=severity,
             detail=f"Found {len(found)} expansion config markers in '{p}'",
             remedy=None,
         )
     return CheckResult(
-        name="pokeemerald-expansion markers",
+        name="expansion_markers",
         ok=False,
-        severity="hard",
+        severity=severity,
         detail=f"Directory '{p}' does not contain pokeemerald-expansion config headers (appears to be vanilla pret or empty)",
         remedy=f"Ensure '{p}' is a pokeemerald-expansion repository (e.g. fork of rh-hideout/pokeemerald-expansion)",
     )
@@ -183,6 +195,7 @@ def check_expansion_markers(repo_path: Path) -> CheckResult:
 
 def check_upstream_remote(repo_path: Path) -> CheckResult:
     p = repo_path.resolve()
+    severity = CHECK_SEVERITY["upstream_remote"]
     try:
         res = subprocess.run(
             ["git", "-C", str(p), "remote", "-v"],
@@ -192,9 +205,9 @@ def check_upstream_remote(repo_path: Path) -> CheckResult:
         )
         if res.returncode == 0 and "upstream" in res.stdout:
             return CheckResult(
-                name="Git upstream remote",
+                name="upstream_remote",
                 ok=True,
-                severity="soft",
+                severity=severity,
                 detail="Upstream remote configured in Git repository",
                 remedy=None,
             )
@@ -202,9 +215,9 @@ def check_upstream_remote(repo_path: Path) -> CheckResult:
         pass
 
     return CheckResult(
-        name="Git upstream remote",
+        name="upstream_remote",
         ok=False,
-        severity="soft",
+        severity=severity,
         detail=f"Repository '{p}' has no 'upstream' remote configured",
         remedy="git remote add upstream https://github.com/rh-hideout/pokeemerald-expansion.git && git fetch upstream --tags",
     )
@@ -212,6 +225,7 @@ def check_upstream_remote(repo_path: Path) -> CheckResult:
 
 def check_tree_clean(repo_path: Path) -> CheckResult:
     p = repo_path.resolve()
+    severity = CHECK_SEVERITY["tree_clean"]
     try:
         res = subprocess.run(
             ["git", "-C", str(p), "status", "--porcelain"],
@@ -221,9 +235,9 @@ def check_tree_clean(repo_path: Path) -> CheckResult:
         )
         if res.returncode == 0 and not res.stdout.strip():
             return CheckResult(
-                name="Git working tree clean",
+                name="tree_clean",
                 ok=True,
-                severity="soft",
+                severity=severity,
                 detail="Working tree is clean",
                 remedy=None,
             )
@@ -231,9 +245,9 @@ def check_tree_clean(repo_path: Path) -> CheckResult:
         pass
 
     return CheckResult(
-        name="Git working tree clean",
+        name="tree_clean",
         ok=False,
-        severity="soft",
+        severity=severity,
         detail=f"Working tree in '{p}' has uncommitted changes",
         remedy="Commit or stash local changes in the ROM repository before running strict builds",
     )
@@ -243,76 +257,37 @@ def run_all(repo_path: Path, cpp: str = "cpp") -> list[CheckResult]:
     """Run every check. Never raises; failures are reported as CheckResult rows."""
     results: list[CheckResult] = []
 
-    try:
-        results.append(check_cpp(cpp))
-    except (OSError, RuntimeError, ValueError) as e:
-        results.append(
-            CheckResult("C preprocessor (cpp)", False, "hard", str(e), "Install cpp")
-        )
-
-    try:
-        results.append(check_repo_present(repo_path))
-    except (OSError, RuntimeError, ValueError) as e:
-        results.append(
-            CheckResult(
-                "ROM repo directory",
-                False,
-                "hard",
-                str(e),
-                "Specify valid repo directory",
+    for name in (
+        "cpp",
+        "repo_present",
+        "is_git_repo",
+        "expansion_markers",
+        "upstream_remote",
+        "tree_clean",
+    ):
+        try:
+            if name == "cpp":
+                res = check_cpp(cpp)
+            elif name == "repo_present":
+                res = check_repo_present(repo_path)
+            elif name == "is_git_repo":
+                res = check_is_git_repo(repo_path)
+            elif name == "expansion_markers":
+                res = check_expansion_markers(repo_path)
+            elif name == "upstream_remote":
+                res = check_upstream_remote(repo_path)
+            else:
+                res = check_tree_clean(repo_path)
+            results.append(res)
+        except (OSError, RuntimeError, ValueError) as e:
+            results.append(
+                CheckResult(
+                    name=name,
+                    ok=False,
+                    severity=CHECK_SEVERITY[name],
+                    detail=f"Check raised internal exception: {e}",
+                    remedy="Investigate system error",
+                )
             )
-        )
-
-    try:
-        results.append(check_is_git_repo(repo_path))
-    except (OSError, RuntimeError, ValueError) as e:
-        results.append(
-            CheckResult(
-                "Git repository",
-                False,
-                "hard",
-                str(e),
-                "Run git init in repo directory",
-            )
-        )
-
-    try:
-        results.append(check_expansion_markers(repo_path))
-    except (OSError, RuntimeError, ValueError) as e:
-        results.append(
-            CheckResult(
-                "pokeemerald-expansion markers",
-                False,
-                "hard",
-                str(e),
-                "Provide expansion repo",
-            )
-        )
-
-    try:
-        results.append(check_upstream_remote(repo_path))
-    except (OSError, RuntimeError, ValueError) as e:
-        results.append(
-            CheckResult(
-                "Git upstream remote",
-                False,
-                "soft",
-                str(e),
-                "git remote add upstream <url>",
-            )
-        )
-
-    try:
-        results.append(check_tree_clean(repo_path))
-    except (OSError, RuntimeError, ValueError) as e:
-        results.append(
-            CheckResult(
-                "Git working tree clean",
-                False,
-                "soft",
-                str(e),
-                "Stash uncommitted changes",
-            )
-        )
 
     return results
