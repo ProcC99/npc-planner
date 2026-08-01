@@ -10,6 +10,10 @@ def test_fake_rom_fixture_structure() -> None:
 
     expected_files = [
         fake_rom_dir / "include" / "constants" / "expansion.h",
+        fake_rom_dir / "include" / "constants" / "battle_ai.h",
+        fake_rom_dir / "include" / "constants" / "difficulty.h",
+        fake_rom_dir / "include" / "constants" / "tms_hms.h",
+        fake_rom_dir / "include" / "constants" / "limits.h",
         fake_rom_dir / "include" / "config" / "battle.h",
         fake_rom_dir / "include" / "config" / "pokemon.h",
         fake_rom_dir / "include" / "config" / "species_enabled.h",

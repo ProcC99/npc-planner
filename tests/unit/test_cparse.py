@@ -1,6 +1,10 @@
+import random
+import string
+
 import pytest
 
 from npc_planner.ingest.cparse import (
+    CMacroCall,
     CParseError,
     parse_array_initializer,
     parse_defines,
@@ -73,6 +77,10 @@ def test_macro_preservation() -> None:
     assert "0" in out or "default" in out or "sSkarmoryLearnset" in out
     moves = next(iter(out.values()))
     assert len(moves) == 2 or isinstance(moves, dict)
+    # Assert CMacroCall equality
+    assert CMacroCall("LEVEL_UP_MOVE", (7, "MOVE_PECK")) == CMacroCall(
+        "LEVEL_UP_MOVE", (7, "MOVE_PECK")
+    )
 
 
 def test_string_literals_concatenation() -> None:
@@ -147,3 +155,19 @@ def test_parse_defines() -> None:
     out = parse_defines(src)
     assert out["P_GEN_1_POKEMON"] == "TRUE"
     assert out["P_MAX_LEVEL"] == "100"
+
+
+def test_property_generated_initializers() -> None:
+    """Property test generator: well-formed initializers match entry count."""
+    rnd = random.Random(42)
+    for _ in range(10):
+        entry_count = rnd.randint(1, 15)
+        entries = []
+        for j in range(entry_count):
+            key = "KEY_" + "".join(rnd.choices(string.ascii_uppercase, k=5)) + f"_{j}"
+            val = rnd.randint(1, 255)
+            entries.append(f"    [{key}] = {{ .val = {val} }},")
+
+        src = "const struct Data gTestSymbol[] = {\n" + "\n".join(entries) + "\n};"
+        parsed = parse_array_initializer(src, "gTestSymbol")
+        assert len(parsed) == entry_count

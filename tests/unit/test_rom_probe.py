@@ -41,13 +41,15 @@ def test_probe_layout_missing_path_raises(tmp_path: Path, no_network: None) -> N
     assert "species_info" in str(exc_info.value).lower()
 
 
-def test_read_pin_fake_rom(tmp_path: Path, no_network: None) -> None:
-    fake_rom_dir = (
-        Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "fake_rom"
-    )
-    pin = read_pin(fake_rom_dir)
-    assert pin.repo_path == fake_rom_dir
-    assert isinstance(pin.hack_dirty, bool)
+def test_read_pin_fake_rom(git_fake_rom: Path, no_network: None) -> None:
+    pin = read_pin(git_fake_rom)
+    assert pin.repo_path == git_fake_rom
+    assert pin.hack_dirty is False
+
+    # Modify a file to make dirty
+    (git_fake_rom / "README.md").write_text("dirty edit\n", encoding="utf-8")
+    pin_dirty = read_pin(git_fake_rom)
+    assert pin_dirty.hack_dirty is True
 
 
 def test_preprocess_rom_script(tmp_path: Path, no_network: None) -> None:
@@ -80,5 +82,4 @@ def test_preprocess_rom_script(tmp_path: Path, no_network: None) -> None:
 
     species_i = (output_dir / "species_info.i").read_text(encoding="utf-8")
     assert "SPECIES_SKARMORY" in species_i
-    # Must honour #if P_GEN_9_POKEMON == TRUE (which is FALSE)
     assert "GEN9_GUARD" not in species_i

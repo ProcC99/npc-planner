@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Union
 
 CValue = Union[int, str, list["CValue"], dict[str, "CValue"], "CMacroCall"]
@@ -10,20 +11,12 @@ class CParseError(ValueError):
     """Raised on unbalanced braces or malformed initialisers. Carries line and column."""
 
 
+@dataclass(frozen=True)
 class CMacroCall:
     """An unexpanded function-like macro, e.g. LEVEL_UP_MOVE(7, MOVE_PECK)."""
 
-    def __init__(self, name: str, args: list[CValue]) -> None:
-        self.name = name
-        self.args = args
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, CMacroCall):
-            return False
-        return self.name == other.name and self.args == other.args
-
-    def __repr__(self) -> str:
-        return f"CMacroCall({self.name!r}, {self.args!r})"
+    name: str
+    args: tuple[CValue, ...]
 
 
 def _strip_comments_and_line_directives(text: str) -> str:
@@ -178,7 +171,7 @@ def _parse_c_value(text: str, start: int) -> tuple[CValue, int]:
                     args.append(int(sub_str))
                 else:
                     args.append(sub_str)
-        return CMacroCall(mname, args), i
+        return CMacroCall(mname, tuple(args)), i
 
     if token.isdigit():
         return int(token), i
@@ -193,8 +186,6 @@ def _parse_inner_braces(inner: str) -> dict[str, CValue] | list[CValue]:
     if not inner:
         return {}
 
-    # Find top-level field assignments: .field = ...
-    # We must respect brace depth so nested .field = inside sub-objects are not matched at top level
     field_matches: list[tuple[str, int, int]] = []
     i = 0
     n = len(inner)
@@ -237,7 +228,6 @@ def _parse_inner_braces(inner: str) -> dict[str, CValue] | list[CValue]:
 
         return result_dict
 
-    # Positional list: {a, b, c}
     items: list[CValue] = []
     parts = inner.split(",")
     for p in parts:

@@ -1,0 +1,17 @@
+#ifndef GUARD_CONSTANTS_TMS_HMS_H
+#define GUARD_CONSTANTS_TMS_HMS_H
+
+#define FOREACH_TM(F) \
+    F(FOCUS_PUNCH) \
+    F(DRAGON_CLAW) \
+    F(TOXIC) \
+    F(TAUNT) \
+    F(REST)
+
+#define TM01_FOCUS_PUNCH 1
+#define TM02_DRAGON_CLAW 2
+#define TM06_TOXIC 6
+#define TM12_TAUNT 12
+#define TM44_REST 44
+
+#endif // GUARD_CONSTANTS_TMS_HMS_H
