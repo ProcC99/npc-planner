@@ -1,0 +1,10 @@
+{
+  "build_id": "m1_tiny_fixture_v1",
+  "built_at": "2026-08-01T00:00:00Z",
+  "tool_version": "0.1.0a1",
+  "baseline_version": "gen3_official_v1",
+  "hack_name": "m1_tiny_test_fixture",
+  "hack_version": "1.0.0",
+  "engine": "pokeemerald",
+  "source_manifest": "{\"m1_tiny\": \"sha1_placeholder\"}"
+}

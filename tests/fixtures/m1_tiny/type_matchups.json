@@ -1,0 +1,12 @@
+[
+  {"attacking_type": "fire", "defending_type": "grass", "multiplier": 2.0},
+  {"attacking_type": "fire", "defending_type": "water", "multiplier": 0.5},
+  {"attacking_type": "water", "defending_type": "fire", "multiplier": 2.0},
+  {"attacking_type": "electric", "defending_type": "water", "multiplier": 2.0},
+  {"attacking_type": "electric", "defending_type": "ground", "multiplier": 0.0},
+  {"attacking_type": "ground", "defending_type": "electric", "multiplier": 2.0},
+  {"attacking_type": "steel", "defending_type": "rock", "multiplier": 2.0},
+  {"attacking_type": "ghost", "defending_type": "normal", "multiplier": 0.0},
+  {"attacking_type": "normal", "defending_type": "ghost", "multiplier": 0.0},
+  {"attacking_type": "psychic", "defending_type": "dark", "multiplier": 0.0}
+]

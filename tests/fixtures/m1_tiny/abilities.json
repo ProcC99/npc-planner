@@ -1,0 +1,72 @@
+[
+  {
+    "ability_slug": "blaze",
+    "ability_name": "Blaze",
+    "rom_ability_id": 66,
+    "engine_symbol": "ABILITY_BLAZE",
+    "description": "Powers up Fire-type moves when HP is low."
+  },
+  {
+    "ability_slug": "torrent",
+    "ability_name": "Torrent",
+    "rom_ability_id": 67,
+    "engine_symbol": "ABILITY_TORRENT",
+    "description": "Powers up Water-type moves when HP is low."
+  },
+  {
+    "ability_slug": "sturdy",
+    "ability_name": "Sturdy",
+    "rom_ability_id": 5,
+    "engine_symbol": "ABILITY_STURDY",
+    "description": "Protects the Pokémon from 1-hit KO attacks."
+  },
+  {
+    "ability_slug": "thick_fat",
+    "ability_name": "Thick Fat",
+    "rom_ability_id": 47,
+    "engine_symbol": "ABILITY_THICK_FAT",
+    "description": "Halves damage taken from Fire and Ice moves."
+  },
+  {
+    "ability_slug": "levitate",
+    "ability_name": "Levitate",
+    "rom_ability_id": 26,
+    "engine_symbol": "ABILITY_LEVITATE",
+    "description": "Gives immunity to Ground-type moves."
+  },
+  {
+    "ability_slug": "trace",
+    "ability_name": "Trace",
+    "rom_ability_id": 36,
+    "engine_symbol": "ABILITY_TRACE",
+    "description": "Copies enemy ability."
+  },
+  {
+    "ability_slug": "intimidate",
+    "ability_name": "Intimidate",
+    "rom_ability_id": 22,
+    "engine_symbol": "ABILITY_INTIMIDATE",
+    "description": "Lowers enemy Attack on entering battle."
+  },
+  {
+    "ability_slug": "clear_body",
+    "ability_name": "Clear Body",
+    "rom_ability_id": 29,
+    "engine_symbol": "ABILITY_CLEAR_BODY",
+    "description": "Prevents stat reduction by enemy moves."
+  },
+  {
+    "ability_slug": "sand_stream",
+    "ability_name": "Sand Stream",
+    "rom_ability_id": 45,
+    "engine_symbol": "ABILITY_SAND_STREAM",
+    "description": "Summons a sandstorm in battle."
+  },
+  {
+    "ability_slug": "natural_cure",
+    "ability_name": "Natural Cure",
+    "rom_ability_id": 30,
+    "engine_symbol": "ABILITY_NATURAL_CURE",
+    "description": "Heals status conditions upon switching out."
+  }
+]

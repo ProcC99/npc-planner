@@ -1,0 +1,102 @@
+[
+  {
+    "move_slug": "flamethrower",
+    "move_name": "Flamethrower",
+    "rom_move_id": 53,
+    "engine_symbol": "MOVE_FLAMETHROWER",
+    "type_slug": "fire",
+    "power": 95, "accuracy": 100, "pp": 15,
+    "priority": 0, "target_mode": "selected",
+    "damage_class": "special"
+  },
+  {
+    "move_slug": "earthquake",
+    "move_name": "Earthquake",
+    "rom_move_id": 89,
+    "engine_symbol": "MOVE_EARTHQUAKE",
+    "type_slug": "ground",
+    "power": 100, "accuracy": 100, "pp": 10,
+    "priority": 0, "target_mode": "all_others",
+    "damage_class": "physical"
+  },
+  {
+    "move_slug": "spikes",
+    "move_name": "Spikes",
+    "rom_move_id": 191,
+    "engine_symbol": "MOVE_SPIKES",
+    "type_slug": "ground",
+    "power": null, "accuracy": null, "pp": 20,
+    "priority": 0, "target_mode": "foe_side",
+    "damage_class": "status"
+  },
+  {
+    "move_slug": "surf",
+    "move_name": "Surf",
+    "rom_move_id": 57,
+    "engine_symbol": "MOVE_SURF",
+    "type_slug": "water",
+    "power": 95, "accuracy": 100, "pp": 15,
+    "priority": 0, "target_mode": "all_others",
+    "damage_class": "special"
+  },
+  {
+    "move_slug": "thunderbolt",
+    "move_name": "Thunderbolt",
+    "rom_move_id": 85,
+    "engine_symbol": "MOVE_THUNDERBOLT",
+    "type_slug": "electric",
+    "power": 95, "accuracy": 100, "pp": 15,
+    "priority": 0, "target_mode": "selected",
+    "damage_class": "special"
+  },
+  {
+    "move_slug": "ice_beam",
+    "move_name": "Ice Beam",
+    "rom_move_id": 58,
+    "engine_symbol": "MOVE_ICE_BEAM",
+    "type_slug": "ice",
+    "power": 95, "accuracy": 100, "pp": 10,
+    "priority": 0, "target_mode": "selected",
+    "damage_class": "special"
+  },
+  {
+    "move_slug": "rock_slide",
+    "move_name": "Rock Slide",
+    "rom_move_id": 157,
+    "engine_symbol": "MOVE_ROCK_SLIDE",
+    "type_slug": "rock",
+    "power": 75, "accuracy": 90, "pp": 10,
+    "priority": 0, "target_mode": "both_foes",
+    "damage_class": "physical"
+  },
+  {
+    "move_slug": "psychic",
+    "move_name": "Psychic",
+    "rom_move_id": 94,
+    "engine_symbol": "MOVE_PSYCHIC",
+    "type_slug": "psychic",
+    "power": 90, "accuracy": 100, "pp": 10,
+    "priority": 0, "target_mode": "selected",
+    "damage_class": "special"
+  },
+  {
+    "move_slug": "shadow_ball",
+    "move_name": "Shadow Ball",
+    "rom_move_id": 247,
+    "engine_symbol": "MOVE_SHADOW_BALL",
+    "type_slug": "ghost",
+    "power": 80, "accuracy": 100, "pp": 15,
+    "priority": 0, "target_mode": "selected",
+    "damage_class": "special"
+  },
+  {
+    "move_slug": "toxic",
+    "move_name": "Toxic",
+    "rom_move_id": 92,
+    "engine_symbol": "MOVE_TOXIC",
+    "type_slug": "poison",
+    "power": null, "accuracy": 85, "pp": 10,
+    "priority": 0, "target_mode": "selected",
+    "damage_class": "status"
+  }
+]

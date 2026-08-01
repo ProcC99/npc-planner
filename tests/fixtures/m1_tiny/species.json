@@ -1,0 +1,12 @@
+[
+  {"species_slug": "charizard", "species_name": "Charizard", "natdex_no": 6, "family_root": "charmander"},
+  {"species_slug": "swampert", "species_name": "Swampert", "natdex_no": 260, "family_root": "mudkip"},
+  {"species_slug": "skarmory", "species_name": "Skarmory", "natdex_no": 227, "family_root": "skarmory"},
+  {"species_slug": "snorlax", "species_name": "Snorlax", "natdex_no": 143, "family_root": "munchlax"},
+  {"species_slug": "gengar", "species_name": "Gengar", "natdex_no": 94, "family_root": "gastly"},
+  {"species_slug": "gardevoir", "species_name": "Gardevoir", "natdex_no": 282, "family_root": "ralts"},
+  {"species_slug": "salamence", "species_name": "Salamence", "natdex_no": 373, "family_root": "bagon"},
+  {"species_slug": "metagross", "species_name": "Metagross", "natdex_no": 376, "family_root": "beldum"},
+  {"species_slug": "tyranitar", "species_name": "Tyranitar", "natdex_no": 248, "family_root": "larvitar"},
+  {"species_slug": "blissey", "species_name": "Blissey", "natdex_no": 242, "family_root": "happiny"}
+]
