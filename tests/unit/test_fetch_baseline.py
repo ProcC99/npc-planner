@@ -1,19 +1,32 @@
 import json
+import socket
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 
-def test_fetch_baseline_fixture_mode(tmp_path: Path) -> None:
+
+@pytest.fixture
+def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _boom(*a: object, **k: object) -> None:
+        raise AssertionError("network access attempted in offline path")
+
+    monkeypatch.setattr(socket.socket, "connect", _boom)
+    monkeypatch.setattr(socket, "create_connection", _boom)
+
+
+def test_fetch_baseline_local_from_mode(tmp_path: Path, no_network: None) -> None:
     output_dir = tmp_path / "raw"
     script_path = Path(__file__).resolve().parents[2] / "scripts" / "fetch_baseline.py"
+    fixture_dir = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "m1_tiny"
 
     result = subprocess.run(
         [
             sys.executable,
             str(script_path),
-            "--fixture",
-            "m1_tiny",
+            "--from",
+            str(fixture_dir),
             "--output",
             str(output_dir),
         ],

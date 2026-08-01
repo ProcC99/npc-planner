@@ -4,10 +4,12 @@ from pathlib import Path
 from typing import Any
 
 
-def load_baseline_dumps(conn: sqlite3.Connection, raw_dir: Path | str) -> int:
+def load_baseline_dumps(
+    conn: sqlite3.Connection, raw_dir: Path | str
+) -> dict[str, int]:
     """Load raw JSON files from raw_dir into stg_* tables and build_info.
 
-    Returns the total number of staging records inserted (including build_info).
+    Returns a dict mapping table names to inserted/replaced row counts.
     """
     path = Path(raw_dir).resolve()
     if not path.exists() or not path.is_dir():
@@ -16,6 +18,15 @@ def load_baseline_dumps(conn: sqlite3.Connection, raw_dir: Path | str) -> int:
     meta_file = path / "meta.json"
     if not meta_file.exists():
         raise FileNotFoundError(f"Missing meta.json in {raw_dir}")
+
+    counts: dict[str, int] = {
+        "build_info": 0,
+        "stg_species": 0,
+        "stg_forms": 0,
+        "stg_moves": 0,
+        "stg_abilities": 0,
+        "stg_type_matchups": 0,
+    }
 
     meta_data: dict[str, Any] = json.loads(meta_file.read_text(encoding="utf-8"))
     conn.execute(
@@ -36,7 +47,7 @@ def load_baseline_dumps(conn: sqlite3.Connection, raw_dir: Path | str) -> int:
             meta_data.get("source_manifest", "{}"),
         ),
     )
-    inserted_count = 1
+    counts["build_info"] = 1
 
     # Ingest species
     species_file = path / "species.json"
@@ -53,7 +64,7 @@ def load_baseline_dumps(conn: sqlite3.Connection, raw_dir: Path | str) -> int:
                     json.dumps(item),
                 ),
             )
-            inserted_count += 1
+        counts["stg_species"] = len(species_list)
 
     # Ingest forms
     forms_file = path / "forms.json"
@@ -70,7 +81,7 @@ def load_baseline_dumps(conn: sqlite3.Connection, raw_dir: Path | str) -> int:
                     json.dumps(item),
                 ),
             )
-            inserted_count += 1
+        counts["stg_forms"] = len(forms_list)
 
     # Ingest moves
     moves_file = path / "moves.json"
@@ -87,7 +98,7 @@ def load_baseline_dumps(conn: sqlite3.Connection, raw_dir: Path | str) -> int:
                     json.dumps(item),
                 ),
             )
-            inserted_count += 1
+        counts["stg_moves"] = len(moves_list)
 
     # Ingest abilities
     abilities_file = path / "abilities.json"
@@ -104,7 +115,7 @@ def load_baseline_dumps(conn: sqlite3.Connection, raw_dir: Path | str) -> int:
                     json.dumps(item),
                 ),
             )
-            inserted_count += 1
+        counts["stg_abilities"] = len(abilities_list)
 
     # Ingest type_matchups
     matchups_file = path / "type_matchups.json"
@@ -121,7 +132,7 @@ def load_baseline_dumps(conn: sqlite3.Connection, raw_dir: Path | str) -> int:
                     item["multiplier"],
                 ),
             )
-            inserted_count += 1
+        counts["stg_type_matchups"] = len(matchups_list)
 
     conn.commit()
-    return inserted_count
+    return counts

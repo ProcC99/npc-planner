@@ -11,26 +11,31 @@ def test_load_baseline_dumps_m1_tiny() -> None:
     init_db(conn)
 
     fixture_dir = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "m1_tiny"
-    total_records = load_baseline_dumps(conn, fixture_dir)
-    assert total_records > 0
+    counts = load_baseline_dumps(conn, fixture_dir)
+    assert isinstance(counts, dict)
+    assert counts["stg_species"] == 10
+    assert counts["stg_forms"] == 10
+    assert counts["stg_moves"] == 10
+    assert counts["stg_abilities"] == 10
+    assert counts["stg_type_matchups"] == 10
 
     build_info = conn.execute("SELECT build_id FROM build_info").fetchone()
     assert build_info is not None
     assert build_info[0] == "m1_tiny_fixture_v1"
+    conn.close()
 
-    stg_species = conn.execute("SELECT COUNT(*) FROM stg_species").fetchone()[0]
-    stg_forms = conn.execute("SELECT COUNT(*) FROM stg_forms").fetchone()[0]
-    stg_moves = conn.execute("SELECT COUNT(*) FROM stg_moves").fetchone()[0]
-    stg_abilities = conn.execute("SELECT COUNT(*) FROM stg_abilities").fetchone()[0]
-    stg_type_matchups = conn.execute(
-        "SELECT COUNT(*) FROM stg_type_matchups"
-    ).fetchone()[0]
 
-    assert stg_species == 10
-    assert stg_forms == 10
-    assert stg_moves == 10
-    assert stg_abilities == 10
-    assert stg_type_matchups == 10
+def test_load_baseline_dumps_idempotency() -> None:
+    conn = create_connection(":memory:")
+    init_db(conn)
+
+    fixture_dir = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "m1_tiny"
+    counts1 = load_baseline_dumps(conn, fixture_dir)
+    counts2 = load_baseline_dumps(conn, fixture_dir)
+
+    assert counts1 == counts2
+    total_forms = conn.execute("SELECT COUNT(*) FROM stg_forms").fetchone()[0]
+    assert total_forms == 10
     conn.close()
 
 
