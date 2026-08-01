@@ -38,6 +38,7 @@ def audit_git_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "# M1-T01\n\n## Files you may create or modify\n\n- `src/a.py`\n",
         encoding="utf-8",
     )
+    (repo / "docs" / "LEDGER.md").write_text("# Ledger\n", encoding="utf-8")
     run_git("add", ".")
     run_git("commit", "-m", "init [protocol]")
 
@@ -104,7 +105,45 @@ def test_15_audit_reads_card_from_commit_tree_not_tip(
     run_git("add", ".")
     run_git("commit", "-m", "docs(tasks): widen M1-T01 card   [protocol]")
 
-    # Auditing commit1_sha directly must report b.py as outside allowlist because in commit1 tree, b.py was not allowed!
     monkeypatch.chdir(audit_git_repo)
     problems = audit_commit(commit1_sha)
     assert any("outside the M1-T01 allowlist: src/b.py" in p for p in problems)
+
+
+def test_16_audit_ci_scope_and_done_tag(
+    audit_git_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def run_git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(audit_git_repo)] + list(args),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+    # Commit 1: ci scope commit
+    (audit_git_repo / ".pre-commit-config.yaml").write_text(
+        "repos: []\n", encoding="utf-8"
+    )
+    run_git("add", ".")
+    run_git("commit", "-m", "chore(ci): update pre-commit   [ci]")
+    commit1_sha = run_git("rev-parse", "HEAD").stdout.strip()
+
+    # Commit 2: record M1-T01 done in ledger
+    (audit_git_repo / "docs" / "LEDGER.md").write_text(
+        "| M1-T01 | done | abc1234 | check ✅ | desc |\n", encoding="utf-8"
+    )
+    run_git("add", ".")
+    run_git("commit", "-m", "docs(ledger): record M1-T01   [ledger]")
+
+    # Commit 3: attempt tag reuse for M1-T01
+    (audit_git_repo / "src").mkdir(parents=True, exist_ok=True)
+    (audit_git_repo / "src" / "a.py").write_text("a = 2\n", encoding="utf-8")
+    run_git("add", ".")
+    run_git("commit", "-m", "feat(db): tag reuse   [M1-T01]")
+    commit3_sha = run_git("rev-parse", "HEAD").stdout.strip()
+
+    monkeypatch.chdir(audit_git_repo)
+    assert audit_commit(commit1_sha) == []
+    probs = audit_commit(commit3_sha)
+    assert any("recorded done" in p for p in probs)

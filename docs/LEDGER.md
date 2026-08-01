@@ -47,9 +47,9 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 
 ---
 
-## Known Historical Violations (Audited by M1-T08e)
+## Known Historical Violations (Audited by M1-T08e / M1-T10b)
 
-These pre-T08e commits contained scope or allowlist violations when checked retrospectively by `scripts/audit_commits.py`.
+These pre-T08e/T10b commits contained scope or allowlist violations when checked retrospectively by `scripts/audit_commits.py`.
 Per Amendment 11, history is not rewritten; violations are recorded here for transparency.
 
 - `7b86b79` (M1-T01): touched files outside allowlist (`.gitignore`, `Makefile`, `README.md`, `docs/schema_manifest.txt`, `docs/tasks/M3-T02.md`, `scripts/check_schema_manifest.py`, `scripts/hooks/*`, `tests/integration/test_init.py`)
@@ -66,3 +66,5 @@ Per Amendment 11, history is not rewritten; violations are recorded here for tra
 - `3d68f61`: untagged commit (`docs(tasks): commit M1-T08c and M1-T08d cards`)
 - `872e751`: untagged commit (`fixup! update task_id_required to support task letter suffixes`)
 - `052b862`: untagged commit (`fixup! add M1-T08e card`)
+- `7d22d8f` (M1-T08e): tag reused after task recorded done in ledger (tag-shopping, not malice)
+- `737dc19` (M1-T08e): tag reused after task recorded done in ledger (tag-shopping, not malice)

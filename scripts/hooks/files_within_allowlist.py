@@ -19,7 +19,7 @@ import subprocess
 import sys
 
 TASK_TAG = re.compile(r"\[(M\d+-T\d+[a-z]?)\]")
-SCOPE_TAG = re.compile(r"\[(ledger|protocol)\]")
+SCOPE_TAG = re.compile(r"\[(ledger|protocol|ci)\]")
 
 ALLOW_HEADING = re.compile(r"^#+\s*Files you may create or modify\s*$", re.IGNORECASE)
 NEXT_HEADING = re.compile(r"^#+\s+")
@@ -32,7 +32,11 @@ PROTOCOL_SCOPE = (
     "EXECUTION_PROTOCOL.md",
     "docs/PROTOCOL_AMENDMENT_*.md",
     "docs/tasks/*.md",
+)
+CI_SCOPE = (
     ".pre-commit-config.yaml",
+    "Makefile",
+    ".github/",
 )
 
 
@@ -108,7 +112,12 @@ def main(argv: list[str]) -> int:
 
     if scope_match and not task_match:
         scope_name = scope_match.group(1)
-        allowed_patterns = LEDGER_SCOPE if scope_name == "ledger" else PROTOCOL_SCOPE
+        if scope_name == "ledger":
+            allowed_patterns = LEDGER_SCOPE
+        elif scope_name == "ci":
+            allowed_patterns = CI_SCOPE
+        else:
+            allowed_patterns = PROTOCOL_SCOPE
         violations = [p for p in staged_files() if not is_allowed(p, allowed_patterns)]
         if violations:
             print(

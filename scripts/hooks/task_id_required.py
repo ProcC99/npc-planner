@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 TASK_TAG = re.compile(r"\[(M\d+-T\d+[a-z]?)\]")
-SCOPE_TAG = re.compile(r"\[(ledger|protocol)\]")
+SCOPE_TAG = re.compile(r"\[(ledger|protocol|ci)\]")
 
 
 def is_merge_commit() -> bool:
@@ -32,6 +32,34 @@ def is_merge_commit() -> bool:
         if (git_dir / "MERGE_HEAD").exists():
             return True
     return False
+
+
+def is_task_done_in_ledger_head(task_id: str) -> tuple[bool, str]:
+    proc = subprocess.run(
+        ["git", "show", "HEAD:docs/LEDGER.md"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return False, ""
+
+    for line in proc.stdout.splitlines():
+        if not line.startswith("|"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) >= 4:
+            row_task = parts[1]
+            row_status = parts[2]
+            row_sha = parts[3]
+            if (
+                row_task == task_id
+                and row_status == "done"
+                and row_sha
+                and row_sha != "—"
+            ):
+                return True, row_sha
+    return False, ""
 
 
 def main(argv: list[str]) -> int:
@@ -61,12 +89,25 @@ def main(argv: list[str]) -> int:
             "  - missing scope tag. Subject must carry exactly one tag:\n"
             "      * Task tag:     [M<n>-T<id>] (e.g. [M1-T08e])\n"
             "      * Ledger tag:   [ledger]\n"
-            "      * Protocol tag: [protocol]\n\n"
+            "      * Protocol tag: [protocol]\n"
+            "      * CI tag:       [ci]\n\n"
             "Example:\n"
             "  chore(ci): enforce card allowlist   [M1-T08e]\n",
             file=sys.stderr,
         )
         return 1
+
+    if task_match:
+        task_id = task_match.group(1)
+        is_done, sha = is_task_done_in_ledger_head(task_id)
+        if is_done:
+            print(
+                "BLOCKED by task-id-required hook\n\n"
+                f"  - task {task_id} is recorded done at {sha}; its tag cannot authorise new work.\n"
+                "    open a lettered follow-up card, or use [ci] / [ledger] / [protocol].\n",
+                file=sys.stderr,
+            )
+            return 1
 
     return 0
 

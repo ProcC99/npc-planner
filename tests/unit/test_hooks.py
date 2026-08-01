@@ -375,7 +375,87 @@ def test_11_allowlist_read_from_head_not_working_tree(
     assert "src/uncommitted_allowed.py" in out
 
 
-# ------------------- must-pass tests 12-13 for check_hooks_installed -------------------
+# ------------------- must-pass tests 23-27 for hooks & scope -------------------
+
+
+def test_23_done_task_tag_rejected(test_git_repo: Path) -> None:
+    ledger = test_git_repo / "docs" / "LEDGER.md"
+    ledger.write_text(
+        "| M1-T08e | done | ef6e0c6 | check ✅ | desc |\n", encoding="utf-8"
+    )
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "add", "docs/LEDGER.md"], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "commit", "-m", "update ledger   [ledger]"],
+        check=True,
+    )
+
+    rc, out = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "feat: reuse finished tag   [M1-T08e]"
+    )
+    assert rc == 1
+    assert "is recorded done at ef6e0c6" in out
+
+
+def test_24_open_task_tag_accepted(test_git_repo: Path) -> None:
+    ledger = test_git_repo / "docs" / "LEDGER.md"
+    ledger.write_text("| M1-T99 | todo | — | — | desc |\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "add", "docs/LEDGER.md"], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "commit", "-m", "update ledger   [ledger]"],
+        check=True,
+    )
+
+    rc, _ = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "feat: work on task   [M1-T99]"
+    )
+    assert rc == 0
+
+
+def test_25_unlisted_tag_or_missing_ledger_accepted(test_git_repo: Path) -> None:
+    rc, _ = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "feat: work on new tag   [M1-T999]"
+    )
+    assert rc == 0
+
+
+def test_26_ci_tag_accepted_and_covers_precommit(test_git_repo: Path) -> None:
+    rc_id, _ = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "chore(ci): update precommit   [ci]"
+    )
+    assert rc_id == 0
+
+    (test_git_repo / ".pre-commit-config.yaml").write_text(
+        "repos: []\n", encoding="utf-8"
+    )
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "add", ".pre-commit-config.yaml"], check=True
+    )
+
+    rc_allow, _ = _run_hook_in_repo(
+        "files_within_allowlist.py", test_git_repo, "chore(ci): update precommit   [ci]"
+    )
+    assert rc_allow == 0
+
+
+def test_27_protocol_scope_excludes_precommit(test_git_repo: Path) -> None:
+    (test_git_repo / ".pre-commit-config.yaml").write_text(
+        "repos: []\n", encoding="utf-8"
+    )
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "add", ".pre-commit-config.yaml"], check=True
+    )
+
+    rc, out = _run_hook_in_repo(
+        "files_within_allowlist.py",
+        test_git_repo,
+        "docs(protocol): edit precommit   [protocol]",
+    )
+    assert rc == 1
+    assert ".pre-commit-config.yaml" in out
 
 
 def test_12_check_hooks_installed_returns_0_when_installed() -> None:

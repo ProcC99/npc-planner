@@ -39,7 +39,7 @@ import subprocess
 import sys
 
 TASK_TAG = re.compile(r"\[(M\d+-T\d+[a-z]?)\]")
-SCOPE_TAG = re.compile(r"\[(ledger|protocol)\]")
+SCOPE_TAG = re.compile(r"\[(ledger|protocol|ci)\]")
 
 ALLOW_HEADING = re.compile(r"^#+\s*Files you may create or modify\s*$", re.IGNORECASE)
 NEXT_HEADING = re.compile(r"^#+\s+")
@@ -48,11 +48,15 @@ BULLET = re.compile(r"^\s*[-*]\s+`([^`]+)`")
 ALWAYS_ALLOWED = ("docs/LEDGER.md",)
 
 LEDGER_SCOPE = ("docs/LEDGER.md",)
+CI_SCOPE = (
+    ".pre-commit-config.yaml",
+    "Makefile",
+    ".github/",
+)
 PROTOCOL_SCOPE = (
     "EXECUTION_PROTOCOL.md",
     "docs/PROTOCOL_AMENDMENT_*.md",
     "docs/tasks/*.md",
-    ".pre-commit-config.yaml",
 )
 
 
@@ -89,6 +93,30 @@ def covered(path: str, patterns: tuple[str, ...] | list[str]) -> bool:
     return False
 
 
+def is_done_tag_violation(sha: str, task_id: str, files: list[str]) -> str | None:
+    if files == ["docs/LEDGER.md"]:
+        return None
+    rc, ledger_text = git("show", f"{sha}~1:docs/LEDGER.md")
+    if rc != 0:
+        return None
+    for line in ledger_text.splitlines():
+        if not line.startswith("|"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) >= 4:
+            row_task = parts[1]
+            row_status = parts[2]
+            row_sha = parts[3]
+            if (
+                row_task == task_id
+                and row_status == "done"
+                and row_sha
+                and row_sha != "—"
+            ):
+                return f"task {task_id} is recorded done at {row_sha}; tag reused"
+    return None
+
+
 def audit_commit(sha: str) -> list[str]:
     """Return a list of human-readable problems with this commit."""
     problems: list[str] = []
@@ -121,16 +149,25 @@ def audit_commit(sha: str) -> list[str]:
         return problems
 
     if scope:
-        allowed = LEDGER_SCOPE if scope.group(1) == "ledger" else PROTOCOL_SCOPE
+        scope_name = scope.group(1)
+        if scope_name == "ledger":
+            allowed = LEDGER_SCOPE
+        elif scope_name == "ci":
+            allowed = CI_SCOPE
+        else:
+            allowed = PROTOCOL_SCOPE
         outside = [f for f in files if not covered(f, allowed)]
         for path in outside:
-            problems.append(
-                f"[{scope.group(1)}] commit touches out-of-scope file: {path}"
-            )
+            problems.append(f"[{scope_name}] commit touches out-of-scope file: {path}")
         return problems
 
     assert task is not None
     task_id = task.group(1)
+
+    done_err = is_done_tag_violation(sha, task_id, files)
+    if done_err:
+        problems.append(done_err)
+
     card_path = f"docs/tasks/{task_id}.md"
     rc, card_text = git("show", f"{sha}:{card_path}")
     if rc != 0:
