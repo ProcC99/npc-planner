@@ -37,6 +37,7 @@ PREPROCESSABLE_FIELDS: tuple[str, ...] = (
 class RomLayout:
     layout_id: str
     config_headers: tuple[Path, ...]
+    config_constants: tuple[Path, ...]
     species_info: tuple[Path, ...]
     moves_info: Path
     abilities: Path
@@ -116,9 +117,13 @@ def probe_layout(repo_path: Path) -> RomLayout:
         cfg_dir / "species_enabled.h",
     )
 
+    const_dir = p / "include" / "constants"
+    const_headers = tuple(sorted(const_dir.glob("*.h"))) if const_dir.exists() else ()
+
     return RomLayout(
         layout_id="expansion_1_9_plus",
         config_headers=cfg_headers,
+        config_constants=const_headers,
         species_info=(species_h,),
         moves_info=moves_h,
         abilities=abilities_h,
