@@ -235,9 +235,8 @@ def test_12_all_acceptance_scripts_syntax_check() -> None:
         res = subprocess.run(
             ["bash", "-n", str(sh_file)], capture_output=True, check=False
         )
-        assert (
-            res.returncode == 0
-        ), f"Syntax error in {sh_file.name}: {res.stderr.decode()}"
+        err_msg = f"Syntax error in {sh_file.name}: {res.stderr.decode()}"
+        assert res.returncode == 0, err_msg
 
 
 # ------------------- must-pass tests 1-6 for task_id_required -------------------
