@@ -156,8 +156,12 @@ printf '%s\n' "chore(ci): reuse a finished tag   [M1-T08e]" > "${TMPMSG}"
 expect_exit 1 done_tag_rejected \
   "${PY}" scripts/hooks/task_id_required.py "${TMPMSG}"
 
-printf '%s\n' "feat(ingest): open task work   [M1-T10b]" > "${TMPMSG}"
+printf '%s\n' "feat(ingest): open task work   [M1-T99z]" > "${TMPMSG}"
 expect_exit 0 open_tag_accepted \
+  "${PY}" scripts/hooks/task_id_required.py "${TMPMSG}"
+
+printf '%s\n' "feat(ingest): finished task work   [M1-T10b]" > "${TMPMSG}"
+expect_exit 1 done_tag_rejected_t10b \
   "${PY}" scripts/hooks/task_id_required.py "${TMPMSG}"
 
 printf '%s\n' "chore(ci): unify formatter   [ci]" > "${TMPMSG}"

@@ -5,6 +5,7 @@ from dataclasses import fields
 from pathlib import Path
 
 import pytest
+from scripts.hooks.task_id_required import parse_ledger_rows, unparsable_ledger_rows
 
 from npc_planner.ingest.rom_probe import (
     PREPROCESSABLE_FIELDS,
@@ -456,6 +457,58 @@ def test_27_protocol_scope_excludes_precommit(test_git_repo: Path) -> None:
     )
     assert rc == 1
     assert ".pre-commit-config.yaml" in out
+
+
+def test_21_every_row_in_real_ledger_parses() -> None:
+    ledger_path = Path(__file__).resolve().parents[2] / "docs" / "LEDGER.md"
+    text = ledger_path.read_text(encoding="utf-8")
+    rows = parse_ledger_rows(text)
+    unparsable = unparsable_ledger_rows(text)
+    assert len(rows) > 0
+    assert unparsable == (), f"Unparsable ledger rows found: {unparsable}"
+
+
+def test_22_unparsable_ledger_row_reported() -> None:
+    bad_text = "| BAD_ROW_NO_PIPES |"
+    unparsable = unparsable_ledger_rows(bad_text)
+    assert len(unparsable) > 0
+
+
+def test_23_and_27_done_tag_guard_prints_stderr_note_on_missing_row(
+    test_git_repo: Path,
+) -> None:
+    rc, out = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "feat: open task   [M1-T99z]"
+    )
+    assert rc == 0
+    assert "note: no parsable ledger row for M1-T99z; done-tag check skipped" in out
+
+
+def test_24_done_tag_t10b_rejected(test_git_repo: Path) -> None:
+    ledger = test_git_repo / "docs" / "LEDGER.md"
+    ledger.write_text(
+        "| M1-T10b | done | 2fe6d25 | check ✅ | desc |\n", encoding="utf-8"
+    )
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "add", "docs/LEDGER.md"], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "commit", "-m", "update ledger   [ledger]"],
+        check=True,
+    )
+
+    rc, out = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "feat: reuse finished tag   [M1-T10b]"
+    )
+    assert rc == 1
+    assert "is recorded done at 2fe6d25" in out
+
+
+def test_25_open_tag_t99z_accepted(test_git_repo: Path) -> None:
+    rc, _ = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "feat: work on open tag   [M1-T99z]"
+    )
+    assert rc == 0
 
 
 def test_12_check_hooks_installed_returns_0_when_installed() -> None:

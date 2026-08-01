@@ -7,6 +7,7 @@ Valid scope tags:
   * Task tag:     [M<n>-T<id>]
   * Ledger tag:   [ledger]
   * Protocol tag: [protocol]
+  * CI tag:       [ci]
 """
 
 from __future__ import annotations
@@ -14,10 +15,65 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 TASK_TAG = re.compile(r"\[(M\d+-T\d+[a-z]?)\]")
 SCOPE_TAG = re.compile(r"\[(ledger|protocol|ci)\]")
+
+
+@dataclass(frozen=True)
+class LedgerRow:
+    task_id: str
+    status: str
+    sha: str
+    check: str
+    description: str
+
+
+def parse_ledger_rows(text: str) -> tuple[LedgerRow, ...]:
+    rows: list[LedgerRow] = []
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) >= 6:
+            task_id = parts[1]
+            status = parts[2]
+            sha = parts[3]
+            check = parts[4]
+            desc = parts[5]
+            if task_id in ("Task", "---") or task_id.startswith((":-", "---")):
+                continue
+            if TASK_TAG.match(f"[{task_id}]"):
+                rows.append(
+                    LedgerRow(
+                        task_id=task_id,
+                        status=status,
+                        sha=sha,
+                        check=check,
+                        description=desc,
+                    )
+                )
+    return tuple(rows)
+
+
+def unparsable_ledger_rows(text: str) -> tuple[str, ...]:
+    unparsable: list[str] = []
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) >= 6:
+            task_id = parts[1]
+            if task_id in ("Task", "---") or task_id.startswith((":-", "---")):
+                continue
+            if not TASK_TAG.match(f"[{task_id}]"):
+                unparsable.append(line)
+        else:
+            if not any(w in line for w in ("Task", "---", ":-")):
+                unparsable.append(line)
+    return tuple(unparsable)
 
 
 def is_merge_commit() -> bool:
@@ -34,7 +90,7 @@ def is_merge_commit() -> bool:
     return False
 
 
-def is_task_done_in_ledger_head(task_id: str) -> tuple[bool, str]:
+def is_task_done_in_ledger_head(task_id: str) -> tuple[bool, str, bool]:
     proc = subprocess.run(
         ["git", "show", "HEAD:docs/LEDGER.md"],
         capture_output=True,
@@ -42,28 +98,54 @@ def is_task_done_in_ledger_head(task_id: str) -> tuple[bool, str]:
         check=False,
     )
     if proc.returncode != 0:
-        return False, ""
+        return False, "", False
 
-    for line in proc.stdout.splitlines():
-        if not line.startswith("|"):
-            continue
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) >= 4:
-            row_task = parts[1]
-            row_status = parts[2]
-            row_sha = parts[3]
-            if (
-                row_task == task_id
-                and row_status == "done"
-                and row_sha
-                and row_sha != "—"
-            ):
-                return True, row_sha
-    return False, ""
+    text = proc.stdout
+    rows = parse_ledger_rows(text)
+    found_row = False
+    for r in rows:
+        if r.task_id == task_id:
+            found_row = True
+            if r.status == "done" and r.sha and r.sha != "—":
+                return True, r.sha, True
+    return False, "", found_row
 
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
+        return 0
+
+    if argv[1] == "--list-unparsable-rows":
+        proc = subprocess.run(
+            ["git", "show", "HEAD:docs/LEDGER.md"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        text = (
+            proc.stdout
+            if proc.returncode == 0
+            else Path("docs/LEDGER.md").read_text(encoding="utf-8")
+        )
+        unparsable = unparsable_ledger_rows(text)
+        print(f"unparsable={unparsable}")
+        return 0 if not unparsable else 1
+
+    if argv[1] == "--list-rows":
+        proc = subprocess.run(
+            ["git", "show", "HEAD:docs/LEDGER.md"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        text = (
+            proc.stdout
+            if proc.returncode == 0
+            else Path("docs/LEDGER.md").read_text(encoding="utf-8")
+        )
+        rows = parse_ledger_rows(text)
+        for r in rows:
+            print(r)
         return 0
 
     if is_merge_commit():
@@ -99,7 +181,7 @@ def main(argv: list[str]) -> int:
 
     if task_match:
         task_id = task_match.group(1)
-        is_done, sha = is_task_done_in_ledger_head(task_id)
+        is_done, sha, found_row = is_task_done_in_ledger_head(task_id)
         if is_done:
             print(
                 "BLOCKED by task-id-required hook\n\n"
@@ -108,6 +190,11 @@ def main(argv: list[str]) -> int:
                 file=sys.stderr,
             )
             return 1
+        if not found_row:
+            print(
+                f"note: no parsable ledger row for {task_id}; done-tag check skipped",
+                file=sys.stderr,
+            )
 
     return 0
 
