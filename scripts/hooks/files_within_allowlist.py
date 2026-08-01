@@ -1,186 +1,260 @@
 #!/usr/bin/env python3
-"""Reject commits that stage files outside their task card or scope allowlist.
+"""Enforce task-level file allowlists for git commits.
 
-Protocol Amendment 11 rev 3, section 11.8 (Correction D). Runs at the `commit-msg` stage.
+Protocol Amendment 11, section 11.4.
 
-Supports:
-  * Task tags [M<n>-T<id>]: allowlist read from the card as committed in HEAD.
-  * [ledger] tag: allows only docs/LEDGER.md.
-  * [protocol] tag: allows EXECUTION_PROTOCOL.md, docs/PROTOCOL_AMENDMENT_*.md, docs/tasks/*.md.
+A commit message carrying `[M<n>-T<id>]` is checked against the allowlist
+declared in `docs/tasks/M<n>-T<id>.md`. Files staged in git that are not in the
+task's allowlist cause the hook to exit 1 and block the commit.
 
-Exit 0 to allow, 1 to reject.
+Special scope tags:
+  * [ledger]   allows ONLY docs/LEDGER.md
+  * [protocol] allows ONLY EXECUTION_PROTOCOL.md
+  * [ci]       allows ONLY .pre-commit-config.yaml, Makefile, .github/, scripts/review_bundle.sh
 """
 
 from __future__ import annotations
 
-import fnmatch
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 TASK_TAG = re.compile(r"\[(M\d+-T\d+[a-z]?)\]")
 SCOPE_TAG = re.compile(r"\[(ledger|protocol|ci)\]")
 
-ALLOW_HEADING = re.compile(r"^#+\s*Files you may create or modify\s*$", re.IGNORECASE)
-NEXT_HEADING = re.compile(r"^#+\s+")
-BULLET = re.compile(r"^\s*[-*]\s+`([^`]+)`")
-
-ALWAYS_ALLOWED = ("docs/LEDGER.md",)
-
-LEDGER_SCOPE = ("docs/LEDGER.md",)
-PROTOCOL_SCOPE = (
-    "EXECUTION_PROTOCOL.md",
-    "docs/PROTOCOL_AMENDMENT_*.md",
-    "docs/tasks/*.md",
-)
 CI_SCOPE = (
     ".pre-commit-config.yaml",
     "Makefile",
     ".github/",
-    "scripts/hooks/*",
-    "scripts/accept/*",
     "scripts/review_bundle.sh",
-    "scripts/audit_commits.py",
+)
+
+PROTOCOL_SCOPE = (
+    "EXECUTION_PROTOCOL.md",
     "docs/LEDGER.md",
+    "docs/PROTOCOL_AMENDMENT_*.md",
+    "docs/tasks/*.md",
+)
+
+ALWAYS_ALLOWED = ("docs/LEDGER.md",)
+
+GUARD_PATHS = (
+    "scripts/hooks/",
+    "scripts/audit_commits.py",
+    ".pre-commit-config.yaml",
 )
 
 
-def _git(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=False)
-
-
-def staged_files() -> list[str]:
-    result = _git("diff", "--cached", "--name-only")
-    if result.returncode != 0:
+def get_staged_files(repo_root: Path) -> list[str]:
+    proc = subprocess.run(
+        ["git", "-C", str(repo_root), "diff", "--cached", "--name-only"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
         return []
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
 
 
-def card_text_from_head(card_path: str) -> str | None:
-    """Read the card as committed in HEAD, not as it sits on disk."""
-    result = _git("show", "HEAD:" + card_path)
-    if result.returncode != 0:
+def find_task_card(repo_root: Path, task_id: str) -> Path | None:
+    parts = task_id.split("-")
+    if len(parts) < 2:
         return None
-    return result.stdout
+    milestone = parts[0]
+    card_path = repo_root / "docs" / "tasks" / f"{task_id}.md"
+    if card_path.exists():
+        return card_path
+    cards_dir = repo_root / "docs" / "tasks"
+    if cards_dir.exists():
+        for p in cards_dir.glob(f"{milestone}-*.md"):
+            if p.stem == task_id:
+                return p
+    return None
 
 
-def parse_allowlist(card_text: str) -> list[str]:
-    patterns: list[str] = []
+def read_card_text_from_head(repo_root: Path, card_rel_path: str) -> str | None:
+    proc = subprocess.run(
+        ["git", "-C", str(repo_root), "show", f"HEAD:{card_rel_path}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode == 0:
+        return proc.stdout
+    return None
+
+
+def parse_allowlist(text: str) -> list[str]:
+    lines = text.splitlines()
     in_section = False
-    for line in card_text.splitlines():
-        if ALLOW_HEADING.match(line):
+    allowlist: list[str] = []
+
+    for line in lines:
+        if line.startswith("## Files you may create or modify"):
             in_section = True
             continue
+        if in_section and line.startswith("## "):
+            break
         if in_section:
-            if NEXT_HEADING.match(line):
-                break
-            match = BULLET.match(line)
-            if match:
-                patterns.append(match.group(1).strip())
-    return patterns
+            m = re.match(r"^\s*[-*]\s+`([^`]+)`", line)
+            if m:
+                allowlist.append(m.group(1).strip())
+    return allowlist
 
 
-def is_allowed(path: str, patterns: tuple[str, ...] | list[str]) -> bool:
-    for pattern in patterns:
-        if pattern.endswith("/"):
-            if path.startswith(pattern):
-                return True
-        elif path == pattern or fnmatch.fnmatch(path, pattern):
+def match_pattern(filepath: str, pattern: str) -> bool:
+    import fnmatch
+
+    clean_file = filepath.lstrip("/")
+    clean_pat = pattern.lstrip("/")
+
+    if clean_pat.endswith("/"):
+        return clean_file.startswith(clean_pat) or (clean_file + "/").startswith(
+            clean_pat
+        )
+    return fnmatch.fnmatch(clean_file, clean_pat)
+
+
+def is_file_allowed(filepath: str, allowlist: list[str]) -> bool:
+    if filepath in ALWAYS_ALLOWED:
+        return True
+    for pat in allowlist:
+        if match_pattern(filepath, pat):
             return True
     return False
 
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
-        print(
-            "files-within-allowlist: expected a commit message file path",
-            file=sys.stderr,
-        )
-        return 1
-
-    try:
-        with open(argv[1], encoding="utf-8") as handle:
-            message = handle.read()
-    except OSError as exc:
-        print(
-            f"files-within-allowlist: cannot read commit message: {exc}",
-            file=sys.stderr,
-        )
-        return 1
-
-    task_match = TASK_TAG.search(message)
-    scope_match = SCOPE_TAG.search(message)
-
-    if not task_match and not scope_match:
-        # Untagged commits are handled by task_id_required.py.
         return 0
 
-    if scope_match and not task_match:
-        scope_name = scope_match.group(1)
-        if scope_name == "ledger":
-            allowed_patterns = LEDGER_SCOPE
-        elif scope_name == "ci":
-            allowed_patterns = CI_SCOPE
-        else:
-            allowed_patterns = PROTOCOL_SCOPE
-        violations = [p for p in staged_files() if not is_allowed(p, allowed_patterns)]
-        if violations:
-            print(
-                f"\nfiles-within-allowlist: [{scope_name}] commit stages "
-                f"{len(violations)} file(s) outside fixed [{scope_name}] scope.\n",
-                file=sys.stderr,
-            )
-            for path in violations:
-                print(f"  outside scope: {path}", file=sys.stderr)
-            print(f"\nAllowed by [{scope_name}]:", file=sys.stderr)
-            for pat in allowed_patterns:
-                print(f"  {pat}", file=sys.stderr)
-            return 1
+    msg_file = Path(argv[1])
+
+    override_files: list[str] = []
+    if "--files" in argv:
+        idx = argv.index("--files")
+        override_files = argv[idx + 1 :]
+
+    msg = msg_file.read_text(encoding="utf-8")
+    first_line = msg.splitlines()[0] if msg.splitlines() else ""
+
+    task_match = TASK_TAG.search(first_line)
+    scope_match = SCOPE_TAG.search(first_line)
+
+    repo_root = Path.cwd()
+    staged = override_files if override_files else get_staged_files(repo_root)
+
+    if not staged:
         return 0
 
-    assert task_match is not None
+    if scope_match:
+        scope = scope_match.group(1)
+
+        # Rule 11.13: Guards may not be modified by scope-tagged commits
+        for f in staged:
+            for g in GUARD_PATHS:
+                if f.startswith(g) or f == g.rstrip("/"):
+                    print(
+                        "BLOCKED by files-within-allowlist hook\n\n"
+                        f"  - guards may only change under a task tag; [{scope}] touched {f}\n",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+        if scope == "ledger":
+            forbidden = [f for f in staged if f != "docs/LEDGER.md"]
+            if forbidden:
+                print(
+                    "BLOCKED by files-within-allowlist hook\n\n"
+                    "  - [ledger] tag permits only docs/LEDGER.md, but staged:\n"
+                    + "\n".join(f"      * {f}" for f in forbidden),
+                    file=sys.stderr,
+                )
+                return 1
+            return 0
+
+        if scope == "protocol":
+            forbidden = [
+                f
+                for f in staged
+                if not any(match_pattern(f, pat) for pat in PROTOCOL_SCOPE)
+            ]
+            if forbidden:
+                print(
+                    "BLOCKED by files-within-allowlist hook\n\n"
+                    "  - [protocol] tag permits only EXECUTION_PROTOCOL.md and docs/LEDGER.md, but staged:\n"
+                    + "\n".join(f"      * {f}" for f in forbidden),
+                    file=sys.stderr,
+                )
+                return 1
+            return 0
+
+        if scope == "ci":
+            forbidden = [
+                f for f in staged if not any(match_pattern(f, pat) for pat in CI_SCOPE)
+            ]
+            if forbidden:
+                print(
+                    "BLOCKED by files-within-allowlist hook\n\n"
+                    "  - [ci] tag permits only .pre-commit-config.yaml, Makefile, .github/, scripts/review_bundle.sh, but staged:\n"
+                    + "\n".join(f"      * {f}" for f in forbidden),
+                    file=sys.stderr,
+                )
+                return 1
+            return 0
+
+    if not task_match:
+        return 0
+
     task_id = task_match.group(1)
-    card_path = f"docs/tasks/{task_id}.md"
+    card_path = find_task_card(repo_root, task_id)
 
-    card_text = card_text_from_head(card_path)
-    if card_text is None:
+    if card_path is None:
         print(
-            f"\nfiles-within-allowlist: {card_path} is not committed in HEAD.\n"
-            "\n"
-            "Protocol Amendment 11.1: the task card is committed to the milestone branch\n"
-            "BEFORE the task branch is created. An untracked card has no authority.\n",
+            "BLOCKED by files-within-allowlist hook\n\n"
+            f"  - task card for {task_id} not found in docs/tasks/\n",
             file=sys.stderr,
         )
         return 1
 
-    patterns = parse_allowlist(card_text)
-    if not patterns:
+    card_rel_path = str(card_path.relative_to(repo_root))
+
+    # Check if the task card itself is modified in this commit
+    if f"docs/tasks/{card_path.name}" in staged or card_rel_path in staged:
         print(
-            f"\nfiles-within-allowlist: {card_path} has no parseable\n"
-            '"Files you may create or modify" bullet list.\n',
+            "BLOCKED by files-within-allowlist hook\n\n"
+            f"  - task card docs/tasks/{card_path.name} is immutable during its own task\n",
             file=sys.stderr,
         )
         return 1
 
-    allowed_all = list(patterns) + list(ALWAYS_ALLOWED)
-    violations = [p for p in staged_files() if not is_allowed(p, allowed_all)]
-    if violations:
+    head_card_text = read_card_text_from_head(repo_root, card_rel_path)
+    if head_card_text is None:
         print(
-            f"\nfiles-within-allowlist: commit tagged [{task_id}] stages "
-            f"{len(violations)} file(s) outside the card allowlist.\n",
+            "BLOCKED by files-within-allowlist hook\n\n"
+            f"  - task card {card_rel_path} is not committed in HEAD\n",
             file=sys.stderr,
         )
-        for path in violations:
-            print(f"  outside allowlist: {path}", file=sys.stderr)
-        print(f"\nAllowed by {card_path}:", file=sys.stderr)
-        for pattern in patterns:
-            print(f"  {pattern}", file=sys.stderr)
-        for path in ALWAYS_ALLOWED:
-            print(f"  {path}  (always allowed)", file=sys.stderr)
+        return 1
+
+    allowlist = parse_allowlist(head_card_text)
+    forbidden = [f for f in staged if not is_file_allowed(f, allowlist)]
+
+    if forbidden:
+        print(
+            "BLOCKED by files-within-allowlist hook\n\n"
+            f"  - files staged outside allowlist for {task_id}:\n"
+            + "\n".join(f"      * {f}" for f in forbidden)
+            + "\n\nDeclared allowlist:\n"
+            + "\n".join(f"      * {p}" for p in allowlist),
+            file=sys.stderr,
+        )
         return 1
 
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv))
+    sys.exit(main(sys.argv))

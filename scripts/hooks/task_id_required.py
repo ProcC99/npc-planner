@@ -106,8 +106,14 @@ def is_task_done_in_ledger_head(task_id: str) -> tuple[bool, str, bool]:
     for r in rows:
         if r.task_id == task_id:
             found_row = True
-            if r.status == "done" and r.sha and r.sha != "—":
-                return True, r.sha, True
+            if r.status == "done":
+                sha_val = r.sha if (r.sha and r.sha != "—") else "placeholder"
+                if sha_val == "placeholder":
+                    print(
+                        f"note: task {task_id} is recorded done with placeholder commit hash '—' in LEDGER.md",
+                        file=sys.stderr,
+                    )
+                return True, sha_val, True
     return False, "", found_row
 
 
@@ -181,11 +187,11 @@ def main(argv: list[str]) -> int:
 
     if task_match:
         task_id = task_match.group(1)
-        is_done, sha, found_row = is_task_done_in_ledger_head(task_id)
-        if is_done:
+        completed, commit_hash, found_row = is_task_done_in_ledger_head(task_id)
+        if completed:
             print(
                 "BLOCKED by task-id-required hook\n\n"
-                f"  - task {task_id} is recorded done at {sha}; its tag cannot authorise new work.\n"
+                f"  - task {task_id} is recorded done at {commit_hash}; its tag cannot authorise new work.\n"
                 "    open a lettered follow-up card, or use [ci] / [ledger] / [protocol].\n",
                 file=sys.stderr,
             )

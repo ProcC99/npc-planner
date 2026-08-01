@@ -527,15 +527,19 @@ gate:
 	python3 -m pre_commit run --all-files
 ```
 
-Note `ruff format --check` and `ruff check` with no `--fix`. Edit until `make gate` is green, then `git add`, then commit once. If you have amended more than twice, stop and report instead of continuing.
+Note `ruff format --check` and `ruff check` with no `--fix`. `ruff check --fix` must not be run before `make gate`, and `--unsafe-fixes` is prohibited outright. Edit until `make gate` is green, then `git add`, then commit once. If you have amended more than twice, stop and report instead of continuing.
 
 ### 11.11 CI scope
 
-Changes to CI mechanism files - `.pre-commit-config.yaml`, `Makefile`, `.github/` - are tagged `[ci]`. A `[ci]` commit must touch only those paths and must add a dated line to `docs/LEDGER.md` naming what changed and why. `.pre-commit-config.yaml` is **not** part of `[protocol]` scope: a protocol commit edits the rules as written, never the machinery that enforces them.
+Changes to CI mechanism files - `.pre-commit-config.yaml`, `Makefile`, `.github/`, `scripts/review_bundle.sh` - are tagged `[ci]`. A `[ci]` commit must touch only those paths and must add a dated line to `docs/LEDGER.md` naming what changed and why. `.pre-commit-config.yaml` is **not** part of `[protocol]` scope: a protocol commit edits the rules as written, never the machinery that enforces them.
 
 ### 11.12 Frozen acceptance scripts
 
 Once a task is recorded `done`, its acceptance script is frozen. If a defect is found in it, the correction is made under the **next** task's allowlist and noted in that task's ledger row. Acceptance scripts are never edited under `[protocol]` or `[ci]`, and never under the tag of the completed task.
+
+### 11.13 Guards do not authorise themselves
+
+A commit may not modify a guard that gates that commit. Enforcement scripts - anything under `scripts/hooks/`, `scripts/audit_commits.py`, and `.pre-commit-config.yaml` - change only under a task tag whose card named them in its allowlist before work began. If a guard rejects a commit, the commit is wrong until a card says otherwise. Widening a scope to make a rejected commit pass is a protocol violation even when the widening is later judged correct.
 
 ---
 

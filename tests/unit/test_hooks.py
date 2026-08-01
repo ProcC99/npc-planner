@@ -78,11 +78,13 @@ def test_1_untagged_commit_ignored(test_git_repo: Path) -> None:
 
 
 def test_2_card_absent_from_head_returns_1(test_git_repo: Path) -> None:
+    (test_git_repo / "foo.py").write_text("a = 1\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(test_git_repo), "add", "foo.py"], check=True)
     rc, out = _run_hook_in_repo(
         "files_within_allowlist.py", test_git_repo, "feat: non-existent card   [M1-T88]"
     )
     assert rc == 1
-    assert "not committed in HEAD" in out
+    assert "not found in docs/tasks/" in out
 
 
 def test_3_allowed_file_accepted(test_git_repo: Path) -> None:
@@ -156,13 +158,13 @@ def test_8_empty_allowlist_returns_1(test_git_repo: Path) -> None:
         ],
         check=True,
     )
-    (test_git_repo / "docs" / "LEDGER.md").write_text("ledger edit\n", encoding="utf-8")
-    subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
+    (test_git_repo / "foo.py").write_text("foo = 1\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(test_git_repo), "add", "foo.py"], check=True)
     rc, out = _run_hook_in_repo(
         "files_within_allowlist.py", test_git_repo, "feat: empty card   [M1-T77]"
     )
     assert rc == 1
-    assert "no parseable" in out
+    assert "outside allowlist" in out
 
 
 def test_9_allowlist_read_from_head_not_working_tree(
@@ -425,19 +427,25 @@ def test_25_unlisted_tag_or_missing_ledger_accepted(test_git_repo: Path) -> None
 
 def test_26_ci_tag_accepted_and_covers_precommit(test_git_repo: Path) -> None:
     rc_id, _ = _run_hook_in_repo(
-        "task_id_required.py", test_git_repo, "chore(ci): update precommit   [ci]"
+        "task_id_required.py", test_git_repo, "chore(ci): update review bundle   [ci]"
     )
     assert rc_id == 0
 
-    (test_git_repo / ".pre-commit-config.yaml").write_text(
-        "repos: []\n", encoding="utf-8"
+    (test_git_repo / "scripts" / "review_bundle.sh").parent.mkdir(
+        parents=True, exist_ok=True
+    )
+    (test_git_repo / "scripts" / "review_bundle.sh").write_text(
+        "# dummy\n", encoding="utf-8"
     )
     subprocess.run(
-        ["git", "-C", str(test_git_repo), "add", ".pre-commit-config.yaml"], check=True
+        ["git", "-C", str(test_git_repo), "add", "scripts/review_bundle.sh"],
+        check=True,
     )
 
     rc_allow, _ = _run_hook_in_repo(
-        "files_within_allowlist.py", test_git_repo, "chore(ci): update precommit   [ci]"
+        "files_within_allowlist.py",
+        test_git_repo,
+        "chore(ci): update review bundle   [ci]",
     )
     assert rc_allow == 0
 
@@ -509,6 +517,75 @@ def test_25_open_tag_t99z_accepted(test_git_repo: Path) -> None:
         "task_id_required.py", test_git_repo, "feat: work on open tag   [M1-T99z]"
     )
     assert rc == 0
+
+
+def test_rule_11_13_ci_tag_cannot_touch_hooks(test_git_repo: Path) -> None:
+    hook_file = test_git_repo / "scripts" / "hooks" / "task_id_required.py"
+    hook_file.parent.mkdir(parents=True, exist_ok=True)
+    hook_file.write_text("# dummy", encoding="utf-8")
+    subprocess.run(["git", "-C", str(test_git_repo), "add", str(hook_file)], check=True)
+
+    rc, out = _run_hook_in_repo(
+        "files_within_allowlist.py",
+        test_git_repo,
+        "chore(ci): update hook   [ci]",
+    )
+    assert rc == 1
+    assert "guards may only change under a task tag" in out
+
+
+def test_rule_11_13_protocol_tag_cannot_touch_auditor(test_git_repo: Path) -> None:
+    audit_file = test_git_repo / "scripts" / "audit_commits.py"
+    audit_file.parent.mkdir(parents=True, exist_ok=True)
+    audit_file.write_text("# dummy", encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "add", str(audit_file)], check=True
+    )
+
+    rc, out = _run_hook_in_repo(
+        "files_within_allowlist.py",
+        test_git_repo,
+        "docs(protocol): edit auditor   [protocol]",
+    )
+    assert rc == 1
+    assert "guards may only change under a task tag" in out
+
+
+def test_rule_11_13_ledger_tag_cannot_touch_precommit(test_git_repo: Path) -> None:
+    pc_file = test_git_repo / ".pre-commit-config.yaml"
+    pc_file.write_text("# dummy", encoding="utf-8")
+    subprocess.run(["git", "-C", str(test_git_repo), "add", str(pc_file)], check=True)
+
+    rc, out = _run_hook_in_repo(
+        "files_within_allowlist.py",
+        test_git_repo,
+        "docs(ledger): edit precommit   [ledger]",
+    )
+    assert rc == 1
+    assert "guards may only change under a task tag" in out
+
+
+def test_done_tag_predicate_placeholder_sha_treated_as_done(
+    test_git_repo: Path,
+) -> None:
+    ledger = test_git_repo / "docs" / "LEDGER.md"
+    ledger.write_text("| M1-T99 | done | — | check ✅ | desc |\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "add", "docs/LEDGER.md"], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(test_git_repo), "commit", "-m", "update ledger   [ledger]"],
+        check=True,
+    )
+
+    rc, out = _run_hook_in_repo(
+        "task_id_required.py",
+        test_git_repo,
+        "feat: reuse tag with placeholder sha   [M1-T99]",
+    )
+    assert rc == 1
+    assert "is recorded done at placeholder" in out
+    assert "placeholder" in out
 
 
 def test_12_check_hooks_installed_returns_0_when_installed() -> None:

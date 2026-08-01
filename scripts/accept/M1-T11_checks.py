@@ -11,17 +11,18 @@ Usage:  python3 scripts/accept/M1-T11_checks.py <probe>
 
 from __future__ import annotations
 
-import dataclasses
 import sys
 from pathlib import Path
 
-from npc_planner.ingest.rom_probe import probe_layout
+from npc_planner.ingest.rom_probe import RomLayout, probe_layout
 from npc_planner.ingest.species import (
     IGNORED_FIELDS,
+    MAPPED_FIELDS,
     SpeciesParseError,
+    SpeciesRecord,
     audit_species_coverage,
     parse_species,
-    read_species,
+    read_species_with_source,
 )
 
 FIXTURE = Path("tests/fixtures/fake_rom")
@@ -33,6 +34,7 @@ const struct SpeciesInfo gSpeciesInfo[] = {
         .baseSpAttack = 50, .baseSpDefense = 50,
         .types = MON_TYPES(TYPE_NORMAL),
         .abilities = { ABILITY_RUN_AWAY },
+        .speciesName = _("Testmon"),
     },
 };
 """
@@ -43,6 +45,7 @@ const struct SpeciesInfo gSpeciesInfo[] = {
         .baseHP = 50, .baseAttack = 50, .baseDefense = 50,
         .baseSpAttack = 50, .baseSpDefense = 50, .baseSpeed = 50,
         .abilities = { ABILITY_RUN_AWAY },
+        .speciesName = _("Testmon"),
     },
 };
 """
@@ -54,6 +57,7 @@ const struct SpeciesInfo gSpeciesInfo[] = {
         .baseSpAttack = 50, .baseSpDefense = 50, .baseSpeed = 50,
         .types = MON_TYPES(TYPE_ELECTRIC, TYPE_ELECTRIC),
         .abilities = { ABILITY_STATIC },
+        .speciesName = _("Testmon"),
     },
 };
 """
@@ -65,6 +69,7 @@ const struct SpeciesInfo gSpeciesInfo[] = {
         .baseSpAttack = 50, .baseSpDefense = 50, .baseSpeed = 50,
         .types = MON_TYPES(TYPE_NORMAL),
         .abilities = { ABILITY_RUN_AWAY },
+        .speciesName = _("Testmon"),
     },
 };
 """
@@ -76,14 +81,21 @@ DUPLICATE_KEY = WELL_FORMED.replace(
         .baseSpAttack = 60, .baseSpDefense = 60, .baseSpeed = 60,
         .types = MON_TYPES(TYPE_NORMAL),
         .abilities = { ABILITY_RUN_AWAY },
+        .speciesName = _("Testmon"),
     },
 };""",
 )
 
+UNKNOWN_KEY = WELL_FORMED.replace(
+    '.speciesName = _("Testmon"),',
+    '.speciesName = _("Testmon"),\n        .someUnknownRomField = 123,',
+)
 
-def _load() -> tuple[object, tuple[object, ...]]:
+
+def _load() -> tuple[RomLayout, str, tuple[SpeciesRecord, ...]]:
     layout = probe_layout(FIXTURE)
-    return layout, read_species(layout)
+    text, records = read_species_with_source(layout)
+    return layout, text, records
 
 
 def _raises(text: str) -> bool:
@@ -95,27 +107,20 @@ def _raises(text: str) -> bool:
 
 
 def probe_skarmory() -> str:
-    _, records = _load()
+    _, _, records = _load()
     by_id = {r.rom_id: r for r in records}
     s = by_id.get("SPECIES_SKARMORY")
     if s is None:
         return "skarmory=absent"
     b = s.base_stats
-    return "skarmory={}|{}|{}|{}|{}|{}|{}|{}|{}".format(
-        b.hp,
-        b.attack,
-        b.defense,
-        b.sp_attack,
-        b.sp_defense,
-        b.speed,
-        ",".join(s.types),
-        s.hidden_ability,
-        s.abilities[0],
+    return (
+        f"skarmory={b.hp}|{b.attack}|{b.defense}|{b.sp_attack}|{b.sp_defense}|{b.speed}|"
+        f"{','.join(s.types)}|{s.hidden_ability}|{s.abilities[0]}"
     )
 
 
 def probe_invariants() -> str:
-    _, records = _load()
+    _, _, records = _load()
     stats = [
         v
         for r in records
@@ -139,13 +144,14 @@ def probe_invariants() -> str:
 
 
 def probe_ordering() -> str:
-    layout, records = _load()
+    layout, _, records = _load()
     ids = [r.rom_id for r in records]
-    return "ordering=%s" % (ids == sorted(ids) and read_species(layout) == records)
+    _, r_recs = read_species_with_source(layout)
+    return f"ordering={ids == sorted(ids) and r_recs == records}"
 
 
 def probe_provenance() -> str:
-    _, records = _load()
+    _, _, records = _load()
     ok = all(
         r.source_type == "rom_extract" and abs(r.confidence - 0.80) < 1e-9
         for r in records
@@ -154,14 +160,14 @@ def probe_provenance() -> str:
 
 
 def probe_coverage_clean() -> str:
-    _, records = _load()
-    return f"uncovered={audit_species_coverage(records)}"
+    _, text, records = _load()
+    return f"uncovered={audit_species_coverage(text, records)}"
 
 
 def probe_coverage_detects() -> str:
-    _, records = _load()
-    planted = dataclasses.replace(records[0], unparsed_fields=("someUnknownRomField",))
-    return "detects=%s" % (len(audit_species_coverage([planted])) > 0)
+    records = parse_species(UNKNOWN_KEY, "synthetic.h")
+    found = audit_species_coverage(UNKNOWN_KEY, records)
+    return f"detects={'someUnknownRomField' in found}"
 
 
 def probe_ignored_pinned() -> str:
@@ -182,9 +188,11 @@ def probe_string_only() -> str:
 
 
 def probe_counts() -> str:
-    _, records = _load()
-    keys = {k for r in records for k in r.unparsed_fields}
-    return f"counts=species:{len(records)} unparsed_keys:{len(keys)} ignored:{len(IGNORED_FIELDS)}"
+    _, text, records = _load()
+    unparsed = {k for r in records for k in r.unparsed_fields}
+    seen = set(MAPPED_FIELDS) | set(IGNORED_FIELDS) | unparsed
+    seen |= set(audit_species_coverage(text, records))
+    return f"counts=species:{len(records)} keys_seen:{len(seen)} unparsed_keys:{len(unparsed)} ignored:{len(IGNORED_FIELDS)}"
 
 
 PROBES = {
@@ -204,8 +212,7 @@ PROBES = {
 
 def main(argv: list[str]) -> int:
     if len(argv) != 2 or argv[1] not in PROBES:
-        sys.stderr.write("usage: M1-T11_checks.py <{}>".format("|".join(PROBES)))
-        sys.stderr.write("\n")
+        sys.stderr.write(f"usage: M1-T11_checks.py <{'|'.join(PROBES)}>\n")
         return 2
     sys.stdout.write(PROBES[argv[1]]())
     sys.stdout.write("\n")

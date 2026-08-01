@@ -122,11 +122,9 @@ def test_16_audit_ci_scope_and_done_tag(
         )
 
     # Commit 1: ci scope commit
-    (audit_git_repo / ".pre-commit-config.yaml").write_text(
-        "repos: []\n", encoding="utf-8"
-    )
+    (audit_git_repo / "Makefile").write_text("all:\n", encoding="utf-8")
     run_git("add", ".")
-    run_git("commit", "-m", "chore(ci): update pre-commit   [ci]")
+    run_git("commit", "-m", "chore(ci): update Makefile   [ci]")
     commit1_sha = run_git("rev-parse", "HEAD").stdout.strip()
 
     # Commit 2: record M1-T01 done in ledger

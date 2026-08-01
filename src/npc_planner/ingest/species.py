@@ -4,12 +4,15 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from npc_planner.ingest.cparse import CMacroCall, CParseError, parse_array_initializer
+from npc_planner.ingest.cparse import (
+    CMacroCall,
+    CParseError,
+    _clean_string_literal,
+    parse_array_initializer,
+)
 from npc_planner.ingest.rom_probe import RomLayout
 
-IGNORED_FIELDS: frozenset[str] = frozenset({"speciesName", "natDexNum"})
-
-_MAPPED_FIELDS: frozenset[str] = frozenset(
+MAPPED_FIELDS: frozenset[str] = frozenset(
     {
         "baseHP",
         "baseAttack",
@@ -20,8 +23,12 @@ _MAPPED_FIELDS: frozenset[str] = frozenset(
         "types",
         "abilities",
         "hiddenAbility",
+        "speciesName",
+        "natDexNum",
     }
 )
+
+IGNORED_FIELDS: frozenset[str] = frozenset()
 
 
 class SpeciesParseError(ValueError):
@@ -41,6 +48,8 @@ class BaseStats:
 @dataclass(frozen=True)
 class SpeciesRecord:
     rom_id: str
+    species_name: str
+    national_dex: int | None
     base_stats: BaseStats
     types: tuple[str, ...]
     raw_types: tuple[str, ...]
@@ -113,6 +122,30 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
 
         raw_keys_tuple = tuple(fields.keys())
 
+        # Validate species_name
+        if "speciesName" not in fields:
+            raise SpeciesParseError(f"Missing speciesName field for {key}")
+        raw_name = fields["speciesName"]
+        if not isinstance(raw_name, str):
+            raise SpeciesParseError(f"Invalid speciesName for {key}")
+        clean_name = _clean_string_literal(raw_name)
+        if not clean_name:
+            raise SpeciesParseError(f"Empty speciesName for {key}")
+        species_name = clean_name
+
+        # Validate national_dex
+        national_dex: int | None = None
+        extra_unparsed: list[str] = []
+        if "natDexNum" in fields:
+            raw_dex = fields["natDexNum"]
+            if isinstance(raw_dex, int):
+                national_dex = raw_dex
+            elif isinstance(raw_dex, str) and raw_dex.isdigit():
+                national_dex = int(raw_dex)
+            else:
+                national_dex = None
+                extra_unparsed.append("natDexNum")
+
         # Validate base stats
         stat_names = (
             ("baseHP", "hp"),
@@ -176,14 +209,13 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
             hidden_ability = raw_abilities[2]
 
         # Determine unparsed fields
-        unparsed: list[str] = []
-        for f in fields:
-            if f not in _MAPPED_FIELDS and f not in IGNORED_FIELDS:
-                unparsed.append(f)
+        unparsed: list[str] = list(extra_unparsed)
 
         records.append(
             SpeciesRecord(
                 rom_id=key,
+                species_name=species_name,
+                national_dex=national_dex,
                 base_stats=base_stats,
                 types=norm_types,
                 raw_types=raw_types,
@@ -204,9 +236,17 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
 
 def read_species(layout: RomLayout) -> tuple[SpeciesRecord, ...]:
     """Read and parse species information from layout.species_info."""
+    _, records = read_species_with_source(layout)
+    return records
+
+
+def read_species_with_source(
+    layout: RomLayout,
+) -> tuple[str, tuple[SpeciesRecord, ...]]:
+    """Read species C source text and parse records from layout.species_info."""
+    all_texts: list[str] = []
     all_records: list[SpeciesRecord] = []
 
-    # Find root path from config_headers or species_info
     all_paths = list(layout.config_headers) + list(layout.species_info)
     root = (
         all_paths[0].parents[2]
@@ -217,6 +257,7 @@ def read_species(layout: RomLayout) -> tuple[SpeciesRecord, ...]:
     for p in layout.species_info:
         if p.exists():
             text = p.read_text(encoding="utf-8")
+            all_texts.append(text)
             try:
                 rel_path = str(p.relative_to(root))
             except ValueError:
@@ -225,21 +266,21 @@ def read_species(layout: RomLayout) -> tuple[SpeciesRecord, ...]:
             all_records.extend(recs)
 
     all_records.sort(key=lambda r: r.rom_id)
-    return tuple(all_records)
+    combined_text = "\n".join(all_texts)
+    return combined_text, tuple(all_records)
 
 
-def audit_species_coverage(records: Sequence[SpeciesRecord]) -> tuple[str, ...]:
-    """Return every initializer key that reached no field, no ignore rule and no unparsed_fields entry.
+def audit_species_coverage(
+    text: str, records: Sequence[SpeciesRecord]
+) -> tuple[str, ...]:
+    """Every `.identifier =` key appearing inside gSpeciesInfo[] in `text` that is not
 
-    Empty means total coverage.
+    in MAPPED_FIELDS, not in IGNORED_FIELDS, and not recorded in any record's
+    unparsed_fields. Empty means genuinely total coverage.
     """
-    unaccounted: set[str] = set()
-    for r in records:
-        accounted = _MAPPED_FIELDS | IGNORED_FIELDS | set(r.unparsed_fields)
-        for k in r.raw_initializer_keys:
-            if k not in accounted:
-                unaccounted.add(k)
-        for k in r.unparsed_fields:
-            if r.raw_initializer_keys and k not in r.raw_initializer_keys:
-                unaccounted.add(k)
+    raw_keys_in_text: set[str] = set(re.findall(r"\.([A-Za-z0-9_]+)\s*=", text))
+    unparsed_in_records: set[str] = {k for r in records for k in r.unparsed_fields}
+
+    accounted = MAPPED_FIELDS | IGNORED_FIELDS | unparsed_in_records
+    unaccounted = raw_keys_in_text - accounted
     return tuple(sorted(unaccounted))

@@ -1,26 +1,7 @@
 #!/usr/bin/env python3
 """Retroactively re-check every commit on a branch against the rules the hooks enforce.
 
-Why this exists
----------------
-`git commit --no-verify` leaves no trace in the commit object. Neither does a
-commit made while the hook layer was uninstalled. Both happened in M1:
-
-  * M1-T00b, M1-T08b and M1-T08c were committed before `make hooks` had ever run.
-  * The M1-T08d squash-merge on milestone/M1 was committed with --no-verify.
-
-Hooks are a *prospective* guard and can always be skipped by the person holding
-the keyboard. This script is the *retrospective* counterpart: it walks history
-and re-applies the same rules to commits that already exist, so a skipped hook
-shows up later instead of never.
-
-Checks applied to every non-merge commit in the range:
-
-  1. The subject carries exactly one recognised scope tag.
-  2. For a task tag, every file touched is covered by that task card's
-     allowlist, as the card existed *in that commit's own tree*.
-  3. For [ledger] and [protocol], the touched files fall inside the fixed
-     scope for that tag.
+Protocol Amendment 11, section 11.13.
 
 Usage:
     python3 scripts/audit_commits.py                    # main..milestone/M1
@@ -52,16 +33,17 @@ CI_SCOPE = (
     ".pre-commit-config.yaml",
     "Makefile",
     ".github/",
-    "scripts/hooks/*",
-    "scripts/accept/*",
     "scripts/review_bundle.sh",
-    "scripts/audit_commits.py",
-    "docs/LEDGER.md",
 )
 PROTOCOL_SCOPE = (
     "EXECUTION_PROTOCOL.md",
     "docs/PROTOCOL_AMENDMENT_*.md",
     "docs/tasks/*.md",
+)
+GUARD_PATHS = (
+    "scripts/hooks/",
+    "scripts/audit_commits.py",
+    ".pre-commit-config.yaml",
 )
 
 
@@ -112,13 +94,9 @@ def is_done_tag_violation(sha: str, task_id: str, files: list[str]) -> str | Non
             row_task = parts[1]
             row_status = parts[2]
             row_sha = parts[3]
-            if (
-                row_task == task_id
-                and row_status == "done"
-                and row_sha
-                and row_sha != "—"
-            ):
-                return f"task {task_id} is recorded done at {row_sha}; tag reused"
+            if row_task == task_id and row_status == "done":
+                sha_str = row_sha if (row_sha and row_sha != "—") else "placeholder"
+                return f"task {task_id} is recorded done at {sha_str}; tag reused"
     return None
 
 
@@ -155,6 +133,14 @@ def audit_commit(sha: str) -> list[str]:
 
     if scope:
         scope_name = scope.group(1)
+        # Check Rule 11.13: scope-tagged commit touching guards
+        for f in files:
+            for g in GUARD_PATHS:
+                if f.startswith(g) or f == g.rstrip("/"):
+                    problems.append(
+                        f"guards may only change under a task tag; [{scope_name}] touched {f}"
+                    )
+
         if scope_name == "ledger":
             allowed = LEDGER_SCOPE
         elif scope_name == "ci":

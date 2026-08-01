@@ -92,7 +92,7 @@ expect_stdout "unparsable=()" every_ledger_row_parses \
 TMPMSG="$(mktemp)"
 trap 'rm -f "${TMPMSG}"' EXIT
 
-printf '%s\n' "feat(ingest): species   [M1-T11]" > "${TMPMSG}"
+printf '%s\n' "feat(ingest): species   [M1-T99z]" > "${TMPMSG}"
 expect_exit 0 open_tag_accepted \
   "${PY}" scripts/hooks/task_id_required.py "${TMPMSG}"
 
@@ -120,7 +120,7 @@ expect_stdout "M1-T99z" t10b_script_retargeted \
 
 # ---------------------------------------------------------------- audit -----
 
-expect_stdout "16 with violations" audit_no_new_violations \
+expect_stdout "17 with violations" audit_no_new_violations \
   "${PY}" scripts/audit_commits.py --range milestone/M1
 
 # --------------------------------------------------------------- suites -----

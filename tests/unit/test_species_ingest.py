@@ -1,4 +1,3 @@
-import dataclasses
 from pathlib import Path
 
 import pytest
@@ -6,11 +5,13 @@ import pytest
 from npc_planner.ingest.rom_probe import probe_layout
 from npc_planner.ingest.species import (
     IGNORED_FIELDS,
+    MAPPED_FIELDS,
     BaseStats,
     SpeciesParseError,
     audit_species_coverage,
     parse_species,
     read_species,
+    read_species_with_source,
 )
 
 
@@ -20,7 +21,7 @@ def fake_rom_layout() -> object:
     return probe_layout(root)
 
 
-# ------------------- must-pass tests 1-20 for species ingest -------------------
+# ------------------- must-pass tests 1-20 for species ingest ------------------
 
 
 def test_1_skarmory_present(fake_rom_layout: object) -> None:
@@ -71,6 +72,7 @@ def test_7_synthetic_monotype_twice() -> None:
             .baseSpAttack = 50, .baseSpDefense = 50, .baseSpeed = 50,
             .types = {TYPE_ELECTRIC, TYPE_ELECTRIC},
             .abilities = {ABILITY_STATIC},
+            .speciesName = _("Testmon"),
         },
     };
     """
@@ -88,6 +90,7 @@ def test_8_missing_base_stat_raises() -> None:
             .baseSpAttack = 50, .baseSpDefense = 50,
             .types = {TYPE_NORMAL},
             .abilities = {ABILITY_RUN_AWAY},
+            .speciesName = _("Testmon"),
         },
     };
     """
@@ -103,6 +106,7 @@ def test_9_no_types_raises() -> None:
             .baseHP = 50, .baseAttack = 50, .baseDefense = 50,
             .baseSpAttack = 50, .baseSpDefense = 50, .baseSpeed = 50,
             .abilities = {ABILITY_RUN_AWAY},
+            .speciesName = _("Testmon"),
         },
     };
     """
@@ -119,12 +123,14 @@ def test_10_duplicate_species_keys_raises() -> None:
             .baseSpAttack = 50, .baseSpDefense = 50, .baseSpeed = 50,
             .types = {TYPE_NORMAL},
             .abilities = {ABILITY_RUN_AWAY},
+            .speciesName = _("Testmon"),
         },
         [SPECIES_TESTMON] = {
             .baseHP = 60, .baseAttack = 60, .baseDefense = 60,
             .baseSpAttack = 60, .baseSpDefense = 60, .baseSpeed = 60,
             .types = {TYPE_NORMAL},
             .abilities = {ABILITY_RUN_AWAY},
+            .speciesName = _("Testmon"),
         },
     };
     """
@@ -137,7 +143,14 @@ def test_11_all_stats_int_0_255(fake_rom_layout: object) -> None:
     records = read_species(fake_rom_layout)  # type: ignore[arg-type]
     for r in records:
         b = r.base_stats
-        for stat_val in (b.hp, b.attack, b.defense, b.sp_attack, b.sp_defense, b.speed):
+        for stat_val in (
+            b.hp,
+            b.attack,
+            b.defense,
+            b.sp_attack,
+            b.sp_defense,
+            b.speed,
+        ):
             assert isinstance(stat_val, int)
             assert 0 <= stat_val <= 255
 
@@ -152,18 +165,30 @@ def test_12_type_and_ability_prefixes(fake_rom_layout: object) -> None:
 
 
 def test_13_audit_species_coverage_clean(fake_rom_layout: object) -> None:
-    records = read_species(fake_rom_layout)  # type: ignore[arg-type]
-    assert audit_species_coverage(records) == ()
+    text, records = read_species_with_source(fake_rom_layout)  # type: ignore[arg-type]
+    assert audit_species_coverage(text, records) == ()
 
 
 def test_14_audit_species_coverage_detects_unknown_key(fake_rom_layout: object) -> None:
-    records = read_species(fake_rom_layout)  # type: ignore[arg-type]
-    planted = dataclasses.replace(records[0], unparsed_fields=("someUnknownRomField",))
-    assert len(audit_species_coverage([planted])) > 0
+    text = """
+    const struct SpeciesInfo gSpeciesInfo[] = {
+        [SPECIES_TESTMON] = {
+            .baseHP = 50, .baseAttack = 50, .baseDefense = 50,
+            .baseSpAttack = 50, .baseSpDefense = 50, .baseSpeed = 50,
+            .types = {TYPE_NORMAL},
+            .abilities = {ABILITY_RUN_AWAY},
+            .speciesName = _("Testmon"),
+            .someUnknownRomField = 123,
+        },
+    };
+    """
+    recs = parse_species(text, "synthetic.h")
+    found = audit_species_coverage(text, recs)
+    assert "someUnknownRomField" in found
 
 
 def test_15_ignored_fields_pinned() -> None:
-    assert IGNORED_FIELDS == frozenset({"speciesName", "natDexNum"})
+    assert IGNORED_FIELDS == frozenset()
 
 
 def test_16_read_species_deterministic(fake_rom_layout: object) -> None:
@@ -195,6 +220,7 @@ def test_19_parse_species_string_only() -> None:
             .baseSpAttack = 50, .baseSpDefense = 50, .baseSpeed = 50,
             .types = {TYPE_NORMAL},
             .abilities = {ABILITY_RUN_AWAY},
+            .speciesName = _("Testmon"),
         },
     };
     """
@@ -214,3 +240,70 @@ def test_20_no_forbidden_eval_calls() -> None:
     text = module_path.read_text(encoding="utf-8")
     for forbidden in ("eval(", "exec(", "literal_eval", "compile("):
         assert forbidden not in text
+
+
+# ------------------- M1-T11b additional coverage & schema tests ---------------
+
+
+def test_21_skarmory_species_name(fake_rom_layout: object) -> None:
+    records = read_species(fake_rom_layout)  # type: ignore[arg-type]
+    s = next(r for r in records if r.rom_id == "SPECIES_SKARMORY")
+    assert s.species_name == "Skarmory"
+
+
+def test_22_missing_or_empty_species_name_raises() -> None:
+    no_name_text = """
+    const struct SpeciesInfo gSpeciesInfo[] = {
+        [SPECIES_TESTMON] = {
+            .baseHP = 50, .baseAttack = 50, .baseDefense = 50,
+            .baseSpAttack = 50, .baseSpDefense = 50, .baseSpeed = 50,
+            .types = {TYPE_NORMAL},
+            .abilities = {ABILITY_RUN_AWAY},
+        },
+    };
+    """
+    empty_name_text = """
+    const struct SpeciesInfo gSpeciesInfo[] = {
+        [SPECIES_TESTMON] = {
+            .baseHP = 50, .baseAttack = 50, .baseDefense = 50,
+            .baseSpAttack = 50, .baseSpDefense = 50, .baseSpeed = 50,
+            .types = {TYPE_NORMAL},
+            .abilities = {ABILITY_RUN_AWAY},
+            .speciesName = _(""),
+        },
+    };
+    """
+    with pytest.raises(SpeciesParseError):
+        parse_species(no_name_text, "synthetic.h")
+    with pytest.raises(SpeciesParseError):
+        parse_species(empty_name_text, "synthetic.h")
+
+
+def test_23_national_dex_resolution(fake_rom_layout: object) -> None:
+    records = read_species(fake_rom_layout)  # type: ignore[arg-type]
+    by_id = {r.rom_id: r for r in records}
+    skarmory = by_id["SPECIES_SKARMORY"]
+    gen9 = by_id["SPECIES_GEN9_GUARD"]
+
+    assert skarmory.national_dex is None
+    assert "natDexNum" in skarmory.unparsed_fields
+    assert gen9.national_dex == 999
+
+
+def test_24_no_species_name_equals_id(fake_rom_layout: object) -> None:
+    records = read_species(fake_rom_layout)  # type: ignore[arg-type]
+    for r in records:
+        assert r.species_name != r.rom_id
+
+
+def test_25_mapped_fields_frozenset() -> None:
+    assert isinstance(MAPPED_FIELDS, frozenset)
+    assert len(MAPPED_FIELDS) > 0
+    assert "speciesName" in MAPPED_FIELDS
+    assert "natDexNum" in MAPPED_FIELDS
+
+
+def test_26_read_species_with_source(fake_rom_layout: object) -> None:
+    text, records = read_species_with_source(fake_rom_layout)  # type: ignore[arg-type]
+    assert len(text) > 0
+    assert len(records) > 0
