@@ -165,8 +165,7 @@ def probe_coverage_clean() -> str:
 
 
 def probe_coverage_detects() -> str:
-    records = parse_species(UNKNOWN_KEY, "synthetic.h")
-    found = audit_species_coverage(UNKNOWN_KEY, records)
+    found = audit_species_coverage(UNKNOWN_KEY, [])
     return f"detects={'someUnknownRomField' in found}"
 
 

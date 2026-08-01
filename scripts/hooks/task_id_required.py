@@ -17,6 +17,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
 TASK_TAG = re.compile(r"\[(M\d+-T\d+[a-z]?)\]")
 SCOPE_TAG = re.compile(r"\[(ledger|protocol|ci)\]")
@@ -90,31 +91,41 @@ def is_merge_commit() -> bool:
     return False
 
 
-def is_task_done_in_ledger_head(task_id: str) -> tuple[bool, str, bool]:
-    proc = subprocess.run(
-        ["git", "show", "HEAD:docs/LEDGER.md"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        return False, "", False
+class DoneCheck(NamedTuple):
+    is_done: bool
+    sha: str
+    row_found: bool
 
-    text = proc.stdout
+
+def is_task_done_in_ledger_head(
+    task_id: str, ledger_text: str | None = None
+) -> DoneCheck:
+    if ledger_text is not None:
+        text = ledger_text
+    else:
+        proc = subprocess.run(
+            ["git", "show", "HEAD:docs/LEDGER.md"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return DoneCheck(is_done=False, sha="", row_found=False)
+        text = proc.stdout
+
     rows = parse_ledger_rows(text)
-    found_row = False
     for r in rows:
         if r.task_id == task_id:
-            found_row = True
             if r.status == "done":
-                sha_val = r.sha if (r.sha and r.sha != "—") else "placeholder"
-                if sha_val == "placeholder":
+                sha_val = r.sha if r.sha else "—"
+                if sha_val == "—":
                     print(
                         f"note: task {task_id} is recorded done with placeholder commit hash '—' in LEDGER.md",
                         file=sys.stderr,
                     )
-                return True, sha_val, True
-    return False, "", found_row
+                return DoneCheck(is_done=True, sha=sha_val, row_found=True)
+            return DoneCheck(is_done=False, sha=r.sha, row_found=True)
+    return DoneCheck(is_done=False, sha="", row_found=False)
 
 
 def main(argv: list[str]) -> int:
@@ -187,16 +198,16 @@ def main(argv: list[str]) -> int:
 
     if task_match:
         task_id = task_match.group(1)
-        completed, commit_hash, found_row = is_task_done_in_ledger_head(task_id)
-        if completed:
+        res = is_task_done_in_ledger_head(task_id)
+        if res.is_done:
             print(
                 "BLOCKED by task-id-required hook\n\n"
-                f"  - task {task_id} is recorded done at {commit_hash}; its tag cannot authorise new work.\n"
+                f"  - task {task_id} is recorded done at {res.sha}; its tag cannot authorise new work.\n"
                 "    open a lettered follow-up card, or use [ci] / [ledger] / [protocol].\n",
                 file=sys.stderr,
             )
             return 1
-        if not found_row:
+        if not res.row_found:
             print(
                 f"note: no parsable ledger row for {task_id}; done-tag check skipped",
                 file=sys.stderr,

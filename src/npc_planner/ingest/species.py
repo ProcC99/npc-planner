@@ -58,9 +58,22 @@ class SpeciesRecord:
     source_file: str
     source_record: str
     unparsed_fields: tuple[str, ...]
+    symbolic_fields: tuple[tuple[str, str], ...]
     source_type: str = "rom_extract"
     confidence: float = 0.80
     raw_initializer_keys: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        keys = tuple(k for k, _ in self.symbolic_fields)
+        if keys != tuple(sorted(keys)):
+            raise SpeciesParseError("symbolic_fields must be sorted by key")
+        overlap = set(keys) & set(self.unparsed_fields)
+        if overlap:
+            raise SpeciesParseError(f"field in both sets: {sorted(overlap)}")
+
+    @property
+    def symbolic_map(self) -> dict[str, str]:
+        return dict(self.symbolic_fields)
 
 
 def _extract_types(val: object, key: str) -> tuple[str, ...]:
@@ -135,7 +148,7 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
 
         # Validate national_dex
         national_dex: int | None = None
-        extra_unparsed: list[str] = []
+        symbolic_list: list[tuple[str, str]] = []
         if "natDexNum" in fields:
             raw_dex = fields["natDexNum"]
             if isinstance(raw_dex, int):
@@ -144,7 +157,7 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
                 national_dex = int(raw_dex)
             else:
                 national_dex = None
-                extra_unparsed.append(f"natDexNum={raw_dex}")
+                symbolic_list.append(("natDexNum", str(raw_dex)))
 
         # Validate base stats
         stat_names = (
@@ -209,7 +222,12 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
             hidden_ability = raw_abilities[2]
 
         # Determine unparsed fields
-        unparsed: list[str] = list(extra_unparsed)
+        unparsed: set[str] = set()
+        for k in fields:
+            if k not in MAPPED_FIELDS and k not in IGNORED_FIELDS:
+                unparsed.add(k)
+
+        symbolic_sorted = tuple(sorted(symbolic_list, key=lambda x: x[0]))
 
         records.append(
             SpeciesRecord(
@@ -223,7 +241,8 @@ def parse_species(text: str, source_file: str) -> tuple[SpeciesRecord, ...]:
                 hidden_ability=hidden_ability,
                 source_file=clean_file,
                 source_record=key,
-                unparsed_fields=tuple(unparsed),
+                unparsed_fields=tuple(sorted(unparsed)),
+                symbolic_fields=symbolic_sorted,
                 source_type="rom_extract",
                 confidence=0.80,
                 raw_initializer_keys=raw_keys_tuple,
@@ -276,13 +295,14 @@ def audit_species_coverage(
     """Every `.identifier =` key appearing inside gSpeciesInfo[] in `text` that is not
 
     in MAPPED_FIELDS, not in IGNORED_FIELDS, and not recorded in any record's
-    unparsed_fields. Empty means genuinely total coverage.
+    unparsed_fields or symbolic_map. Empty means genuinely total coverage.
     """
     raw_keys_in_text: set[str] = set(re.findall(r"\.([A-Za-z0-9_]+)\s*=", text))
-    unparsed_in_records: set[str] = {
-        k.split("=")[0] for r in records for k in r.unparsed_fields
-    }
+    unparsed_in_records: set[str] = {k for r in records for k in r.unparsed_fields}
+    symbolic_keys_in_records: set[str] = {k for r in records for k in r.symbolic_map}
 
-    accounted = MAPPED_FIELDS | IGNORED_FIELDS | unparsed_in_records
+    accounted = (
+        MAPPED_FIELDS | IGNORED_FIELDS | unparsed_in_records | symbolic_keys_in_records
+    )
     unaccounted = raw_keys_in_text - accounted
     return tuple(sorted(unaccounted))

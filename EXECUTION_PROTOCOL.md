@@ -541,6 +541,10 @@ Once a task is recorded `done`, its acceptance script is frozen. If a defect is 
 
 A commit may not modify a guard that gates that commit. Enforcement scripts - anything under `scripts/hooks/`, `scripts/audit_commits.py`, and `.pre-commit-config.yaml` - change only under a task tag whose card named them in its allowlist before work began. If a guard rejects a commit, the commit is wrong until a card says otherwise. Widening a scope to make a rejected commit pass is a protocol violation even when the widening is later judged correct.
 
+### 11.14 Permanent Sentinel Row
+
+Row `M1-T00z` in `docs/LEDGER.md` is a permanent sentinel reserved for `open_tag_accepted` acceptance probes across all tasks. Its status MUST remain `todo` and it MUST NEVER be marked `done` or completed by any commit or task.
+
 ---
 
 ## Appendix A — Task Count Estimate

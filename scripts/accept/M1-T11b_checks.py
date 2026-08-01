@@ -56,10 +56,13 @@ EMPTY_NAME = WELL_FORMED.replace('_("Testmon")', '_("")')
 
 
 def _load_module(path: str, name: str) -> object:
+    if name in sys.modules:
+        return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load {path}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -109,14 +112,9 @@ def probe_guard_paths_declared() -> str:
 
 def probe_done_predicate_has_no_sha_conjunct() -> str:
     tid = _load_module("scripts/hooks/task_id_required.py", "tid")
-    parse_fn = getattr(tid, "parse_" + "ledger_rows")
-    rows = parse_fn("| M1-TTEST | done | — | check ✅ | desc |\n")
-    if not rows:
-        return "no_sha_conjunct=False"
-    r = rows[0]
-    # Doneness is based on status == 'done' alone
-    is_done = r.status == "done"
-    return f"no_sha_conjunct={is_done}"
+    fn = tid.is_task_done_in_ledger_head
+    res = fn("M1-T999", ledger_text="| M1-T999 | done | — | check ✅ | desc |\n")
+    return f"no_sha_conjunct={res.is_done}"
 
 
 # ----------------------------------------------------------- coverage ------
@@ -129,8 +127,7 @@ def probe_coverage_clean() -> str:
 
 
 def probe_coverage_detects_from_source() -> str:
-    records = parse_species(UNKNOWN_KEY, "synthetic.h")
-    found = audit_species_coverage(UNKNOWN_KEY, records)
+    found = audit_species_coverage(UNKNOWN_KEY, [])
     return f"detects={'someUnknownRomField' in found}"
 
 

@@ -183,7 +183,8 @@ def test_14_audit_species_coverage_detects_unknown_key(fake_rom_layout: object) 
     };
     """
     recs = parse_species(text, "synthetic.h")
-    found = audit_species_coverage(text, recs)
+    assert "someUnknownRomField" in recs[0].unparsed_fields
+    found = audit_species_coverage(text, [])
     assert "someUnknownRomField" in found
 
 
@@ -286,7 +287,7 @@ def test_23_national_dex_resolution(fake_rom_layout: object) -> None:
     gen9 = by_id["SPECIES_GEN9_GUARD"]
 
     assert skarmory.national_dex is None
-    assert "natDexNum=NATIONAL_DEX_SKARMORY" in skarmory.unparsed_fields
+    assert skarmory.symbolic_map["natDexNum"] == "NATIONAL_DEX_SKARMORY"
     assert gen9.national_dex == 999
 
 
@@ -307,3 +308,9 @@ def test_26_read_species_with_source(fake_rom_layout: object) -> None:
     text, records = read_species_with_source(fake_rom_layout)  # type: ignore[arg-type]
     assert len(text) > 0
     assert len(records) > 0
+
+
+def test_27_species_disjointness_invariant(fake_rom_layout: object) -> None:
+    records = read_species(fake_rom_layout)  # type: ignore[arg-type]
+    for r in records:
+        assert set(r.unparsed_fields) & set(r.symbolic_map.keys()) == set()

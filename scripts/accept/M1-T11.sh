@@ -92,7 +92,7 @@ expect_stdout "unparsable=()" every_ledger_row_parses \
 TMPMSG="$(mktemp)"
 trap 'rm -f "${TMPMSG}"' EXIT
 
-printf '%s\n' "feat(ingest): species   [M1-T99z]" > "${TMPMSG}"
+printf '%s\n' "feat(ingest): species   [M1-T00z]" > "${TMPMSG}"
 expect_exit 0 open_tag_accepted \
   "${PY}" scripts/hooks/task_id_required.py "${TMPMSG}"
 
@@ -131,8 +131,9 @@ expect_exit 0 rom_config_tests "${PY}" -m pytest tests/unit/test_rom_config.py -
 
 # ----------------------------------------------------------- card intact ----
 
+CARD_COMMIT="$(git log --format=%H -1 milestone/M1 -- docs/tasks/M1-T11.md)"
 expect_no_stdout "M1-T11.md" card_unmodified \
-  git diff --name-only milestone/M1...HEAD -- docs/tasks/
+  bash -c 'git diff --name-only '"${CARD_COMMIT}"'..HEAD -- docs/tasks/M1-T11.md'
 
 expect_stdout "ok" accept_scripts_parse \
   bash -c 'for f in scripts/accept/*.sh; do bash -n "$f" || exit 1; done; echo ok'

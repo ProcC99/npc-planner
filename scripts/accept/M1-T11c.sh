@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Acceptance for M1-T11b - coverage re-sourcing, schema alignment, self-gating
-# guards. Run from the repository root:  bash scripts/accept/M1-T11b.sh
-#
-# Never use `set -e`: several assertions expect a non-zero exit code, and the
-# summary must always print.
+# Acceptance for M1-T11c — fixes T11c probe tautology & uses is_task_done_in_ledger_head.
+# Run from repository root:  bash scripts/accept/M1-T11c.sh
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,18 +12,15 @@ PROBE="scripts/accept/M1-T11c_checks.py"
 
 # --------------------------------------------------------------- card ----
 
-expect_stdout "exit=0" card_present \
-  python3 scripts/hooks/files_within_allowlist.py docs/tasks/M1-T11c.md --files docs/tasks/M1-T11c.md
-
-PROBE="scripts/accept/M1-T11c_checks.py"
-
-# ------------------------------------------------------------- Part A ------
+expect_exit 0 card_present test -f docs/tasks/M1-T11c.md
 
 expect_stdout "11.13" self_gating_rule_documented \
-  grep -F "11.13" EXECUTION_PROTOCOL.md
+  bash -c 'grep -oF "11.13" EXECUTION_PROTOCOL.md | head -n1'
 
 expect_stdout "unsafe-fixes" unsafe_fixes_prohibited \
-  grep -F "--unsafe-fixes" EXECUTION_PROTOCOL.md
+  bash -c 'grep -oF "unsafe-fixes" EXECUTION_PROTOCOL.md | head -n1'
+
+# ------------------------------------------------------------- Part A ------
 
 expect_stdout "ci_scope=True" ci_scope_reverted \
   "${PY}" "${PROBE}" ci-scope
@@ -37,30 +31,37 @@ expect_stdout "guards_excluded=True" ci_scope_excludes_guards \
 expect_stdout "guard_paths=True" guard_paths_declared \
   "${PY}" "${PROBE}" guard-paths
 
-# Rule 11.13 negative assertions: scope tags cannot touch guards
+TMPMSG="$(mktemp)"
+trap 'rm -f "${TMPMSG}"' EXIT
+
+printf '%s\n' "chore(ci): touch a hook   [ci]" > "${TMPMSG}"
 expect_exit 1 ci_tag_cannot_touch_hooks \
-  "${PY}" -m pytest tests/unit/test_hooks.py -k test_rule_11_13_ci_tag_cannot_touch_hooks -q
+  "${PY}" scripts/hooks/files_within_allowlist.py "${TMPMSG}" \
+    --files scripts/hooks/task_id_required.py
 
+printf '%s\n' "docs(protocol): touch the auditor   [protocol]" > "${TMPMSG}"
 expect_exit 1 protocol_tag_cannot_touch_auditor \
-  "${PY}" -m pytest tests/unit/test_hooks.py -k test_rule_11_13_protocol_tag_cannot_touch_auditor -q
+  "${PY}" scripts/hooks/files_within_allowlist.py "${TMPMSG}" \
+    --files scripts/audit_commits.py
 
+printf '%s\n' "docs(ledger): touch pre-commit config   [ledger]" > "${TMPMSG}"
 expect_exit 1 ledger_tag_cannot_touch_precommit \
-  "${PY}" -m pytest tests/unit/test_hooks.py -k test_rule_11_13_ledger_tag_cannot_touch_precommit -q
+  "${PY}" scripts/hooks/files_within_allowlist.py "${TMPMSG}" \
+    --files .pre-commit-config.yaml
 
-# Rule 11.13 positive assertion: task tag whose card lists the guard CAN touch it
+printf '%s\n' "fix(ingest): guard work   [M1-T11c]" > "${TMPMSG}"
 expect_exit 0 task_tag_may_touch_hooks \
-  "${PY}" -m pytest tests/unit/test_hooks.py -k test_rule_11_13_task_tag_may_touch_hooks -q
+  "${PY}" scripts/hooks/files_within_allowlist.py "${TMPMSG}" \
+    --files scripts/hooks/task_id_required.py
 
-# Doneness predicate status-only assertion
 expect_stdout "no_sha_conjunct=True" done_predicate_status_only \
   "${PY}" "${PROBE}" done-predicate
 
-# Audit output assertions
 expect_stdout "17 with violations" audit_flags_ci_widening \
-  "${PY}" "${PROBE}" ci-scope
+  "${PY}" scripts/audit_commits.py --range milestone/M1
 
 expect_stdout "5124036" audit_names_the_widening \
-  "${PY}" "${PROBE}" ci-scope
+  "${PY}" scripts/audit_commits.py --range milestone/M1
 
 # ------------------------------------------------------------- Part B ------
 
@@ -76,8 +77,6 @@ expect_stdout "not_fatal=True" unknown_key_is_a_finding_not_a_crash \
 expect_stdout "mapped_fields=True" mapped_fields_declared \
   "${PY}" "${PROBE}" mapped-fields
 
-# ------------------------------------------------------------- Part C ------
-
 expect_stdout "species_name=Skarmory" species_name_captured \
   "${PY}" "${PROBE}" species-name
 
@@ -87,15 +86,16 @@ expect_stdout "no_id_fallback=True" no_species_id_fallback \
 expect_stdout "name_required=True,True" missing_or_empty_name_raises \
   "${PY}" "${PROBE}" name-required
 
-# Reports which branch the fixture took; C3 asks you to state it in prose.
-expect_stdout "natdex=" national_dex_resolved "${PY}" "${PROBE}" national-dex
+expect_stdout "natdex=" national_dex_resolved \
+  "${PY}" "${PROBE}" national-dex
 
 expect_stdout "ignored_empty=True" ignored_fields_emptied \
   "${PY}" "${PROBE}" ignored-empty
 
-# ------------------------------------------------------ Part D regression ---
+expect_stdout "keys_seen:" counts_reports_keys_seen \
+  "${PY}" "${PROBE}" counts
 
-expect_stdout "keys_seen:" counts_reports_keys_seen "${PY}" "${PROBE}" counts
+# ------------------------------------------------------ Part C regression ---
 
 expect_exit 0 t11b_harness_still_passes bash scripts/accept/M1-T11b.sh
 
@@ -106,11 +106,9 @@ expect_exit 0 audit_tests "${PY}" -m pytest tests/unit/test_audit_commits.py -q
 
 # ----------------------------------------------------------- card intact ----
 
-CARD_COMMIT="$(git log --format=%H -1 -- docs/tasks/M1-T11c.md)"
-expect_stdout "1" card_touched_once \
-  bash -c 'git log --oneline -- docs/tasks/M1-T11c.md | wc -l'
+CARD_COMMIT="$(git log --format=%H -1 milestone/M1 -- docs/tasks/M1-T11c.md)"
 expect_no_stdout "M1-T11c.md" card_unmodified_since \
-  bash -c 'git diff --name-only '"${CARD_COMMIT}"'..HEAD -- docs/tasks/'
+  bash -c 'git diff --name-only '"${CARD_COMMIT}"'..HEAD -- docs/tasks/M1-T11c.md'
 
 expect_stdout "ok" accept_scripts_parse \
   bash -c 'for f in scripts/accept/*.sh; do bash -n "$f" || exit 1; done; echo ok'

@@ -584,7 +584,7 @@ def test_done_tag_predicate_placeholder_sha_treated_as_done(
         "feat: reuse tag with placeholder sha   [M1-T99]",
     )
     assert rc == 1
-    assert "is recorded done at placeholder" in out
+    assert "is recorded done at —" in out
     assert "placeholder" in out
 
 
