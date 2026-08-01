@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Retroactively re-check every commit on a branch against the rules the hooks enforce.
+
+Why this exists
+---------------
+`git commit --no-verify` leaves no trace in the commit object. Neither does a
+commit made while the hook layer was uninstalled. Both happened in M1:
+
+  * M1-T00b, M1-T08b and M1-T08c were committed before `make hooks` had ever run.
+  * The M1-T08d squash-merge on milestone/M1 was committed with --no-verify.
+
+Hooks are a *prospective* guard and can always be skipped by the person holding
+the keyboard. This script is the *retrospective* counterpart: it walks history
+and re-applies the same rules to commits that already exist, so a skipped hook
+shows up later instead of never.
+
+Checks applied to every non-merge commit in the range:
+
+  1. The subject carries exactly one recognised scope tag.
+  2. For a task tag, every file touched is covered by that task card's
+     allowlist, as the card existed *in that commit's own tree*.
+  3. For [ledger] and [protocol], the touched files fall inside the fixed
+     scope for that tag.
+
+Usage:
+    python3 scripts/audit_commits.py                    # main..milestone/M1
+    python3 scripts/audit_commits.py --range main..HEAD
+    python3 scripts/audit_commits.py --range main..HEAD --since-task M1-T08
+
+Exit codes: 0 clean, 1 violations found, 2 usage or git error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fnmatch
+import re
+import subprocess
+import sys
+
+TASK_TAG = re.compile(r"\[(M\d+-T\d+[a-z]?)\]")
+SCOPE_TAG = re.compile(r"\[(ledger|protocol)\]")
+
+ALLOW_HEADING = re.compile(r"^#+\s*Files you may create or modify\s*$", re.IGNORECASE)
+NEXT_HEADING = re.compile(r"^#+\s+")
+BULLET = re.compile(r"^\s*[-*]\s+`([^`]+)`")
+
+ALWAYS_ALLOWED = ("docs/LEDGER.md",)
+
+LEDGER_SCOPE = ("docs/LEDGER.md",)
+PROTOCOL_SCOPE = (
+    "EXECUTION_PROTOCOL.md",
+    "docs/PROTOCOL_AMENDMENT_*.md",
+    "docs/tasks/*.md",
+)
+
+
+def git(*args: str) -> tuple[int, str]:
+    proc = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+    return proc.returncode, proc.stdout
+
+
+def parse_allowlist(text: str) -> list[str]:
+    """Pull backtick-quoted paths out of the card's allowlist section."""
+    lines = text.splitlines()
+    out: list[str] = []
+    inside = False
+    for line in lines:
+        if ALLOW_HEADING.match(line):
+            inside = True
+            continue
+        if inside and NEXT_HEADING.match(line):
+            break
+        if inside:
+            found = BULLET.match(line)
+            if found:
+                out.append(found.group(1).strip())
+    return out
+
+
+def covered(path: str, patterns: tuple[str, ...] | list[str]) -> bool:
+    for pattern in patterns:
+        if pattern.endswith("/"):
+            if path.startswith(pattern):
+                return True
+        elif path == pattern or fnmatch.fnmatch(path, pattern):
+            return True
+    return False
+
+
+def audit_commit(sha: str) -> list[str]:
+    """Return a list of human-readable problems with this commit."""
+    problems: list[str] = []
+
+    rc, subject = git("log", "-1", "--format=%s", sha)
+    if rc != 0:
+        return [f"cannot read subject for {sha}"]
+    subject = subject.strip()
+
+    rc, files_out = git("show", "--name-only", "--format=", sha)
+    if rc != 0:
+        return [f"cannot list files for {sha}"]
+    files = [line.strip() for line in files_out.splitlines() if line.strip()]
+    if not files:
+        return []
+
+    task = TASK_TAG.search(subject)
+    scope = SCOPE_TAG.search(subject)
+
+    if task and scope:
+        problems.append("carries both a task tag and a scope tag; use exactly one")
+        return problems
+
+    if not task and not scope:
+        problems.append(
+            "untagged commit. Untagged commits bypass the allowlist entirely, "
+            "which is how scripts/hooks/task_id_required.py was modified outside "
+            "any card during M1-T08d."
+        )
+        return problems
+
+    if scope:
+        allowed = LEDGER_SCOPE if scope.group(1) == "ledger" else PROTOCOL_SCOPE
+        outside = [f for f in files if not covered(f, allowed)]
+        for path in outside:
+            problems.append(
+                f"[{scope.group(1)}] commit touches out-of-scope file: {path}"
+            )
+        return problems
+
+    assert task is not None
+    task_id = task.group(1)
+    card_path = f"docs/tasks/{task_id}.md"
+    rc, card_text = git("show", f"{sha}:{card_path}")
+    if rc != 0:
+        problems.append(
+            f"tagged [{task_id}] but {card_path} does not exist in that commit's tree. "
+            "The card was committed after the work, or not at all."
+        )
+        return problems
+
+    allowed = parse_allowlist(card_text)
+    if not allowed:
+        problems.append(f"{card_path} has no parseable allowlist section")
+        return problems
+
+    allowed_all = list(allowed) + list(ALWAYS_ALLOWED)
+    for path in files:
+        if path == card_path:
+            continue
+        if not covered(path, allowed_all):
+            problems.append(f"outside the {task_id} allowlist: {path}")
+    return problems
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--range", dest="rev_range", default="main..milestone/M1")
+    parser.add_argument(
+        "--since-task",
+        default=None,
+        help="Only report on commits whose task tag sorts at or after this id.",
+    )
+    args = parser.parse_args(argv)
+
+    rc, log = git("log", "--no-merges", "--format=%H", args.rev_range)
+    if rc != 0:
+        print(f"audit-commits: cannot walk {args.rev_range}", file=sys.stderr)
+        return 2
+
+    shas = [line.strip() for line in log.splitlines() if line.strip()]
+    shas.reverse()
+
+    total = 0
+    bad = 0
+    for sha in shas:
+        _, subject = git("log", "-1", "--format=%s", sha)
+        subject = subject.strip()
+        if args.since_task:
+            found = TASK_TAG.search(subject)
+            if found and found.group(1) < args.since_task:
+                continue
+        total += 1
+        problems = audit_commit(sha)
+        if problems:
+            bad += 1
+            print(f"{sha[:7]}  {subject}")
+            for problem in problems:
+                print(f"          - {problem}")
+
+    print("-" * 62)
+    print(f"audit: {total - bad}/{total} commits clean, {bad} with violations")
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

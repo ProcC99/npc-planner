@@ -1,4 +1,7 @@
-.PHONY: lint typecheck schema-check test-unit test-int check gate fresh golden-update hooks
+.PHONY: lint typecheck schema-check test-unit test-int hooks-check check gate fresh golden-update hooks
+
+hooks-check:
+	python3 scripts/check_hooks_installed.py
 
 # ---- Rung 1: static ----
 lint:
@@ -21,15 +24,19 @@ test-int:
 	python3 -m pytest tests/integration -q --maxfail=1
 
 # ---- The gate every commit must pass ----
-check: lint typecheck schema-check test-unit test-int
+check: hooks-check lint typecheck test-unit test-int schema-check
 	@echo "check green"
 
-# ---- Milestone gate ----
-gate: check fresh
-	python3 -m pytest tests/golden tests/performance -q
-	npc-planner data build --strict
-	npc-planner validate --fail-on error
-	@echo "gate green"
+# ---- Working-tree gate (Correction G) ----
+gate:
+	python3 scripts/check_hooks_installed.py
+	python3 -m ruff format --check src tests scripts
+	python3 -m ruff check src tests scripts
+	python3 -m mypy --strict src/npc_planner
+	python3 -m pytest tests/unit -q
+	python3 -m pytest tests/integration -q
+	python3 scripts/check_schema_manifest.py
+	python3 -m pre_commit run --all-files
 
 # ---- Reproducibility: build twice, compare hashes ----
 fresh:

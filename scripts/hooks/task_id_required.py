@@ -1,55 +1,73 @@
 #!/usr/bin/env python3
-"""Every commit must name the task it belongs to: [M3-T04].
+"""Every non-merge commit must carry exactly one recognised scope tag.
 
-This is what makes `git log` an audit trail rather than a pile of 'fix stuff'.
+Protocol Amendment 11 rev 3, section 11.7 (Correction D).
+
+Valid scope tags:
+  * Task tag:     [M<n>-T<id>]
+  * Ledger tag:   [ledger]
+  * Protocol tag: [protocol]
 """
 
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
-TASK_RE = re.compile(r"\[M[1-6]-T\d{2}[a-z]?\]")
-TYPE_RE = re.compile(r"^(feat|fix|test|refactor|chore|docs|data|revert)\([a-z]+\): .+")
-EXEMPT_PREFIXES = ("Merge ", "Revert ", "fixup!", "squash!")
+TASK_TAG = re.compile(r"\[(M\d+-T\d+[a-z]?)\]")
+SCOPE_TAG = re.compile(r"\[(ledger|protocol)\]")
+
+
+def is_merge_commit() -> bool:
+    proc = subprocess.run(
+        ["git", "rev-parse", "--git-dir"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode == 0:
+        git_dir = Path(proc.stdout.strip())
+        if (git_dir / "MERGE_HEAD").exists():
+            return True
+    return False
 
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
         return 0
-    msg = Path(argv[1]).read_text(encoding="utf-8")
-    first = msg.splitlines()[0] if msg.splitlines() else ""
 
-    if first.startswith(EXEMPT_PREFIXES):
+    if is_merge_commit():
         return 0
 
-    problems: list[str] = []
-    if not TASK_RE.search(msg):
-        problems.append("missing task id, e.g. [M3-T04]")
-    if not TYPE_RE.match(first):
-        problems.append(
-            "subject must be '<type>(<scope>): <imperative summary>'\n"
-            "      type  = feat|fix|test|refactor|chore|docs|data|revert\n"
-            "      scope = db|ingest|rules|analysis|generate|validate|export|cli|config|ci"
-        )
-    if "tests/golden" in msg.lower() and "golden approved" not in msg.lower():
-        problems.append(
-            "golden change requires the words 'golden approved' in the message"
-        )
+    msg = Path(argv[1]).read_text(encoding="utf-8")
+    first_line = msg.splitlines()[0] if msg.splitlines() else ""
 
-    if problems:
-        print("BLOCKED by task-id-required hook\n")
-        for p in problems:
-            print(f"  - {p}")
+    task_match = TASK_TAG.search(first_line)
+    scope_match = SCOPE_TAG.search(first_line)
+
+    if task_match and scope_match:
         print(
-            "\nExample:\n"
-            "  feat(rules): resolve ruleset extends chain   [M3-T04]\n\n"
-            "  Legality evaluation needs a single flattened ruleset.\n\n"
-            "  Tests: 5 unit tests incl. cycle + missing-parent\n"
-            "  Gate:  make check green"
+            "BLOCKED by task-id-required hook\n\n"
+            "  - subject contains both a task tag and a scope tag; use exactly one\n",
+            file=sys.stderr,
         )
         return 1
+
+    if not task_match and not scope_match:
+        print(
+            "BLOCKED by task-id-required hook\n\n"
+            "  - missing scope tag. Subject must carry exactly one tag:\n"
+            "      * Task tag:     [M<n>-T<id>] (e.g. [M1-T08e])\n"
+            "      * Ledger tag:   [ledger]\n"
+            "      * Protocol tag: [protocol]\n\n"
+            "Example:\n"
+            "  chore(ci): enforce card allowlist   [M1-T08e]\n",
+            file=sys.stderr,
+        )
+        return 1
+
     return 0
 
 

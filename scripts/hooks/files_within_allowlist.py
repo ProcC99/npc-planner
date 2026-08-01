@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Reject commits that stage files outside their task card's allowlist.
+"""Reject commits that stage files outside their task card or scope allowlist.
 
-Protocol Amendment 11.8. Runs at the `commit-msg` stage, so the task id is available.
+Protocol Amendment 11 rev 3, section 11.8 (Correction D). Runs at the `commit-msg` stage.
 
-Also enforces Amendment 11.1 (revised): the task card must already be committed in HEAD
-before the task branch does any work. If the card is missing from HEAD, the commit is
-rejected, because an untracked card cannot be an authority over anything.
+Supports:
+  * Task tags [M<n>-T<id>]: allowlist read from the card as committed in HEAD.
+  * [ledger] tag: allows only docs/LEDGER.md.
+  * [protocol] tag: allows EXECUTION_PROTOCOL.md, docs/PROTOCOL_AMENDMENT_*.md, docs/tasks/*.md.
 
 Exit 0 to allow, 1 to reject.
 """
@@ -18,15 +19,20 @@ import subprocess
 import sys
 
 TASK_TAG = re.compile(r"\[(M\d+-T\d+[a-z]?)\]")
+SCOPE_TAG = re.compile(r"\[(ledger|protocol)\]")
 
-# The section whose bullet list defines the allowlist.
 ALLOW_HEADING = re.compile(r"^#+\s*Files you may create or modify\s*$", re.IGNORECASE)
 NEXT_HEADING = re.compile(r"^#+\s+")
-# Bullet lines look like:  - `path/to/file.py`   (trailing prose after the backticks is ignored)
 BULLET = re.compile(r"^\s*[-*]\s+`([^`]+)`")
 
-# Bookkeeping files every task is permitted to touch.
 ALWAYS_ALLOWED = ("docs/LEDGER.md",)
+
+LEDGER_SCOPE = ("docs/LEDGER.md",)
+PROTOCOL_SCOPE = (
+    "EXECUTION_PROTOCOL.md",
+    "docs/PROTOCOL_AMENDMENT_*.md",
+    "docs/tasks/*.md",
+)
 
 
 def _git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -41,12 +47,8 @@ def staged_files() -> list[str]:
 
 
 def card_text_from_head(card_path: str) -> str | None:
-    """Read the card as committed in HEAD, not as it sits on disk.
-
-    Reading from HEAD is deliberate: a card edited in the working tree must not be
-    able to widen its own allowlist for the commit currently being made.
-    """
-    result = _git("show", f"HEAD:{card_path}")
+    """Read the card as committed in HEAD, not as it sits on disk."""
+    result = _git("show", "HEAD:" + card_path)
     if result.returncode != 0:
         return None
     return result.stdout
@@ -68,14 +70,12 @@ def parse_allowlist(card_text: str) -> list[str]:
     return patterns
 
 
-def is_allowed(path: str, patterns: list[str]) -> bool:
-    if path in ALWAYS_ALLOWED:
-        return True
+def is_allowed(path: str, patterns: tuple[str, ...] | list[str]) -> bool:
     for pattern in patterns:
-        if path == pattern or fnmatch.fnmatch(path, pattern):
-            return True
-        # A directory pattern such as `tests/fixtures/fake_rom/` covers everything beneath it.
-        if pattern.endswith("/") and path.startswith(pattern):
+        if pattern.endswith("/"):
+            if path.startswith(pattern):
+                return True
+        elif path == pattern or fnmatch.fnmatch(path, pattern):
             return True
     return False
 
@@ -98,12 +98,33 @@ def main(argv: list[str]) -> int:
         )
         return 1
 
-    match = TASK_TAG.search(message)
-    if match is None:
-        # Untagged commits are the concern of task_id_required.py.
+    task_match = TASK_TAG.search(message)
+    scope_match = SCOPE_TAG.search(message)
+
+    if not task_match and not scope_match:
+        # Untagged commits are handled by task_id_required.py.
         return 0
 
-    task_id = match.group(1)
+    if scope_match and not task_match:
+        scope_name = scope_match.group(1)
+        allowed_patterns = LEDGER_SCOPE if scope_name == "ledger" else PROTOCOL_SCOPE
+        violations = [p for p in staged_files() if not is_allowed(p, allowed_patterns)]
+        if violations:
+            print(
+                f"\nfiles-within-allowlist: [{scope_name}] commit stages "
+                f"{len(violations)} file(s) outside fixed [{scope_name}] scope.\n",
+                file=sys.stderr,
+            )
+            for path in violations:
+                print(f"  outside scope: {path}", file=sys.stderr)
+            print(f"\nAllowed by [{scope_name}]:", file=sys.stderr)
+            for pat in allowed_patterns:
+                print(f"  {pat}", file=sys.stderr)
+            return 1
+        return 0
+
+    assert task_match is not None
+    task_id = task_match.group(1)
     card_path = f"docs/tasks/{task_id}.md"
 
     card_text = card_text_from_head(card_path)
@@ -112,13 +133,7 @@ def main(argv: list[str]) -> int:
             f"\nfiles-within-allowlist: {card_path} is not committed in HEAD.\n"
             "\n"
             "Protocol Amendment 11.1: the task card is committed to the milestone branch\n"
-            "BEFORE the task branch is created. An untracked card has no authority, and\n"
-            "card immutability cannot be enforced against a file git has never seen.\n"
-            "\n"
-            "  git checkout milestone/<M>\n"
-            f"  git add {card_path}\n"
-            f'  git commit -m "docs(tasks): add {task_id} card"\n'
-            f"  git checkout -b task/{task_id}\n",
+            "BEFORE the task branch is created. An untracked card has no authority.\n",
             file=sys.stderr,
         )
         return 1
@@ -127,14 +142,13 @@ def main(argv: list[str]) -> int:
     if not patterns:
         print(
             f"\nfiles-within-allowlist: {card_path} has no parseable\n"
-            '"Files you may create or modify" bullet list.\n'
-            "\n"
-            "Expected bullets of the form:   - `src/npc_planner/thing.py`\n",
+            '"Files you may create or modify" bullet list.\n',
             file=sys.stderr,
         )
         return 1
 
-    violations = [p for p in staged_files() if not is_allowed(p, patterns)]
+    allowed_all = list(patterns) + list(ALWAYS_ALLOWED)
+    violations = [p for p in staged_files() if not is_allowed(p, allowed_all)]
     if violations:
         print(
             f"\nfiles-within-allowlist: commit tagged [{task_id}] stages "
@@ -143,21 +157,11 @@ def main(argv: list[str]) -> int:
         )
         for path in violations:
             print(f"  outside allowlist: {path}", file=sys.stderr)
-        print(
-            "\nAllowed by " + card_path + ":",
-            file=sys.stderr,
-        )
+        print(f"\nAllowed by {card_path}:", file=sys.stderr)
         for pattern in patterns:
             print(f"  {pattern}", file=sys.stderr)
         for path in ALWAYS_ALLOWED:
             print(f"  {path}  (always allowed)", file=sys.stderr)
-        print(
-            "\nUnrelated work belongs in its own commit. Protocol scaffolding, hook\n"
-            "installation, and documentation restructuring are chore commits, not task\n"
-            "commits. Unstage the extras:\n"
-            "\n  git restore --staged " + " ".join(violations) + "\n",
-            file=sys.stderr,
-        )
         return 1
 
     return 0

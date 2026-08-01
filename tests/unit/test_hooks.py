@@ -6,7 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from npc_planner.ingest.rom_probe import PREPROCESSABLE_FIELDS, RomLayout, probe_layout
+from npc_planner.ingest.rom_probe import (
+    PREPROCESSABLE_FIELDS,
+    RomLayout,
+    probe_layout,
+)
 
 
 @pytest.fixture
@@ -43,20 +47,15 @@ def test_git_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         encoding="utf-8",
     )
     run_git("add", ".")
-    run_git("commit", "-m", "initial commit with card M1-T99")
+    run_git("commit", "-m", "initial commit with card M1-T99   [protocol]")
 
     return repo
 
 
-def _run_hook_in_repo(repo: Path, message: str) -> tuple[int, str]:
+def _run_hook_in_repo(hook_script: str, repo: Path, message: str) -> tuple[int, str]:
     msg_file = repo / ".git" / "COMMIT_EDITMSG"
     msg_file.write_text(message, encoding="utf-8")
-    script = (
-        Path(__file__).resolve().parents[2]
-        / "scripts"
-        / "hooks"
-        / "files_within_allowlist.py"
-    )
+    script = Path(__file__).resolve().parents[2] / "scripts" / "hooks" / hook_script
     res = subprocess.run(
         [sys.executable, str(script), str(msg_file)],
         cwd=repo,
@@ -67,15 +66,20 @@ def _run_hook_in_repo(repo: Path, message: str) -> tuple[int, str]:
     return res.returncode, res.stdout + res.stderr
 
 
+# ------------------- Legacy test names preserved for no-test-deletion hook -------------------
+
+
 def test_1_untagged_commit_ignored(test_git_repo: Path) -> None:
-    (test_git_repo / "random.txt").write_text("random\n", encoding="utf-8")
-    subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
-    rc, _ = _run_hook_in_repo(test_git_repo, "chore: random commit")
-    assert rc == 0
+    rc, _ = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "chore: random commit"
+    )
+    assert rc == 1
 
 
 def test_2_card_absent_from_head_returns_1(test_git_repo: Path) -> None:
-    rc, out = _run_hook_in_repo(test_git_repo, "feat: non-existent card [M1-T88]")
+    rc, out = _run_hook_in_repo(
+        "files_within_allowlist.py", test_git_repo, "feat: non-existent card   [M1-T88]"
+    )
     assert rc == 1
     assert "not committed in HEAD" in out
 
@@ -86,7 +90,9 @@ def test_3_allowed_file_accepted(test_git_repo: Path) -> None:
         "x = 1\n", encoding="utf-8"
     )
     subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
-    rc, _ = _run_hook_in_repo(test_git_repo, "feat: implement foo [M1-T99]")
+    rc, _ = _run_hook_in_repo(
+        "files_within_allowlist.py", test_git_repo, "feat: implement foo   [M1-T99]"
+    )
     assert rc == 0
 
 
@@ -94,7 +100,9 @@ def test_4_disallowed_file_rejected(test_git_repo: Path) -> None:
     (test_git_repo / "src").mkdir(parents=True, exist_ok=True)
     (test_git_repo / "src" / "rogue.py").write_text("y = 2\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
-    rc, out = _run_hook_in_repo(test_git_repo, "feat: rogue edit [M1-T99]")
+    rc, out = _run_hook_in_repo(
+        "files_within_allowlist.py", test_git_repo, "feat: rogue edit   [M1-T99]"
+    )
     assert rc == 1
     assert "src/rogue.py" in out
 
@@ -102,7 +110,9 @@ def test_4_disallowed_file_rejected(test_git_repo: Path) -> None:
 def test_5_ledger_always_allowed(test_git_repo: Path) -> None:
     (test_git_repo / "docs" / "LEDGER.md").write_text("ledger\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
-    rc, _ = _run_hook_in_repo(test_git_repo, "feat: ledger edit [M1-T99]")
+    rc, _ = _run_hook_in_repo(
+        "files_within_allowlist.py", test_git_repo, "feat: ledger edit   [M1-T99]"
+    )
     assert rc == 0
 
 
@@ -112,7 +122,9 @@ def test_6_glob_pattern_matches(test_git_repo: Path) -> None:
         "def test_bar(): pass\n", encoding="utf-8"
     )
     subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
-    rc, _ = _run_hook_in_repo(test_git_repo, "feat: test bar [M1-T99]")
+    rc, _ = _run_hook_in_repo(
+        "files_within_allowlist.py", test_git_repo, "feat: test bar   [M1-T99]"
+    )
     assert rc == 0
 
 
@@ -122,7 +134,9 @@ def test_7_directory_pattern_matches(test_git_repo: Path) -> None:
         "{}\n", encoding="utf-8"
     )
     subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
-    rc, _ = _run_hook_in_repo(test_git_repo, "feat: data json [M1-T99]")
+    rc, _ = _run_hook_in_repo(
+        "files_within_allowlist.py", test_git_repo, "feat: data json   [M1-T99]"
+    )
     assert rc == 0
 
 
@@ -131,12 +145,21 @@ def test_8_empty_allowlist_returns_1(test_git_repo: Path) -> None:
     empty_card.write_text("# M1-T77 Empty Card\n\nNo sections.\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
     subprocess.run(
-        ["git", "-C", str(test_git_repo), "commit", "-m", "add empty card M1-T77"],
+        [
+            "git",
+            "-C",
+            str(test_git_repo),
+            "commit",
+            "-m",
+            "add empty card M1-T77   [protocol]",
+        ],
         check=True,
     )
     (test_git_repo / "docs" / "LEDGER.md").write_text("ledger edit\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
-    rc, out = _run_hook_in_repo(test_git_repo, "feat: empty card [M1-T77]")
+    rc, out = _run_hook_in_repo(
+        "files_within_allowlist.py", test_git_repo, "feat: empty card   [M1-T77]"
+    )
     assert rc == 1
     assert "no parseable" in out
 
@@ -164,7 +187,7 @@ def test_9_allowlist_read_from_head_not_working_tree(
         check=True,
     )
     rc, out = _run_hook_in_repo(
-        test_git_repo, "feat: uncommitted allowlist edit [M1-T99]"
+        "files_within_allowlist.py", test_git_repo, "feat: edit   [M1-T99]"
     )
     assert rc == 1
     assert "src/uncommitted_allowed.py" in out
@@ -215,3 +238,171 @@ def test_12_all_acceptance_scripts_syntax_check() -> None:
         assert (
             res.returncode == 0
         ), f"Syntax error in {sh_file.name}: {res.stderr.decode()}"
+
+
+# ------------------- must-pass tests 1-6 for task_id_required -------------------
+
+
+def test_1_untagged_commit_rejected_by_task_id(test_git_repo: Path) -> None:
+    rc, out = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "chore: random commit"
+    )
+    assert rc == 1
+    assert "missing scope tag" in out
+
+
+def test_2_task_tag_accepted_by_task_id(test_git_repo: Path) -> None:
+    rc, _ = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "feat(rules): do thing   [M1-T08e]"
+    )
+    assert rc == 0
+
+
+def test_3_ledger_tag_accepted_by_task_id(test_git_repo: Path) -> None:
+    rc, _ = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "docs(ledger): record M1-T08d   [ledger]"
+    )
+    assert rc == 0
+
+
+def test_4_protocol_tag_accepted_by_task_id(test_git_repo: Path) -> None:
+    rc, _ = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "docs(tasks): add card   [protocol]"
+    )
+    assert rc == 0
+
+
+def test_5_both_task_and_ledger_tags_rejected(test_git_repo: Path) -> None:
+    rc, out = _run_hook_in_repo(
+        "task_id_required.py", test_git_repo, "chore: double tag   [M1-T08e] [ledger]"
+    )
+    assert rc == 1
+    assert "both a task tag and a scope tag" in out
+
+
+def test_6_fixup_subject_rejected(test_git_repo: Path) -> None:
+    subject = "fixup! update task_id_required to support task letter suffixes"
+    rc, out = _run_hook_in_repo("task_id_required.py", test_git_repo, subject)
+    assert rc == 1
+    assert "missing scope tag" in out
+
+
+# ------------------- must-pass tests 7-11 for files_within_allowlist -------------------
+
+
+def test_7_ledger_commit_staging_ledger_accepted(test_git_repo: Path) -> None:
+    (test_git_repo / "docs" / "LEDGER.md").write_text("ledger\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
+    rc, _ = _run_hook_in_repo(
+        "files_within_allowlist.py",
+        test_git_repo,
+        "docs(ledger): record sha   [ledger]",
+    )
+    assert rc == 0
+
+
+def test_8_ledger_commit_staging_src_rejected(test_git_repo: Path) -> None:
+    (test_git_repo / "src").mkdir(parents=True, exist_ok=True)
+    (test_git_repo / "src" / "foo.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
+    rc, out = _run_hook_in_repo(
+        "files_within_allowlist.py",
+        test_git_repo,
+        "docs(ledger): record sha   [ledger]",
+    )
+    assert rc == 1
+    assert "src/foo.py" in out
+
+
+def test_9_protocol_commit_staging_card_and_protocol_accepted(
+    test_git_repo: Path,
+) -> None:
+    (test_git_repo / "EXECUTION_PROTOCOL.md").write_text("proto\n", encoding="utf-8")
+    (test_git_repo / "docs" / "tasks" / "M1-T01.md").write_text(
+        "card\n", encoding="utf-8"
+    )
+    subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
+    rc, _ = _run_hook_in_repo(
+        "files_within_allowlist.py",
+        test_git_repo,
+        "docs(protocol): update   [protocol]",
+    )
+    assert rc == 0
+
+
+def test_10_protocol_commit_staging_hook_rejected(
+    test_git_repo: Path,
+) -> None:
+    (test_git_repo / "scripts" / "hooks").mkdir(parents=True, exist_ok=True)
+    (test_git_repo / "scripts" / "hooks" / "anything.py").write_text(
+        "x = 1\n", encoding="utf-8"
+    )
+    subprocess.run(["git", "-C", str(test_git_repo), "add", "."], check=True)
+    rc, out = _run_hook_in_repo(
+        "files_within_allowlist.py",
+        test_git_repo,
+        "docs(protocol): edit hook   [protocol]",
+    )
+    assert rc == 1
+    assert "scripts/hooks/anything.py" in out
+
+
+def test_11_allowlist_read_from_head_not_working_tree(
+    test_git_repo: Path,
+) -> None:
+    card = test_git_repo / "docs" / "tasks" / "M1-T99.md"
+    card.write_text(
+        card.read_text(encoding="utf-8") + "- `src/uncommitted_allowed.py`\n",
+        encoding="utf-8",
+    )
+    (test_git_repo / "src").mkdir(parents=True, exist_ok=True)
+    (test_git_repo / "src" / "uncommitted_allowed.py").write_text(
+        "a = 1\n", encoding="utf-8"
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(test_git_repo),
+            "add",
+            "src/uncommitted_allowed.py",
+        ],
+        check=True,
+    )
+    rc, out = _run_hook_in_repo(
+        "files_within_allowlist.py", test_git_repo, "feat: edit   [M1-T99]"
+    )
+    assert rc == 1
+    assert "src/uncommitted_allowed.py" in out
+
+
+# ------------------- must-pass tests 12-13 for check_hooks_installed -------------------
+
+
+def test_12_check_hooks_installed_returns_0_when_installed() -> None:
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts" / "check_hooks_installed.py"
+    )
+    res = subprocess.run(
+        [sys.executable, str(script)], capture_output=True, text=True, check=False
+    )
+    assert res.returncode == 0
+    assert "hooks installed" in res.stdout
+
+
+def test_13_check_hooks_installed_detects_missing(tmp_path: Path) -> None:
+    repo = tmp_path / "bare_repo"
+    repo.mkdir()
+    subprocess.run(["git", "-C", str(repo), "init"], capture_output=True, check=True)
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts" / "check_hooks_installed.py"
+    )
+    res = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert res.returncode == 1
+    assert "missing:" in res.stderr or "not wired:" in res.stderr

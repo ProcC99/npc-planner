@@ -144,7 +144,8 @@ Gate:  make check green
 - **Never commit red** to a task branch except as an explicit `wip:` commit that will be squashed away.
 - **Never amend or force-push** a commit that has been merged into a milestone branch.
 - **Never squash a milestone branch into a single commit at merge.** The per-task history is the audit trail; it is how a human bisects the model's mistakes.
-- **Ledger sha recording.** The ledger records the **milestone-branch** sha produced by the squash merge, never the task-branch sha. Task branches are deleted and their commits garbage-collected; a ledger pointing at them decays into dead references.
+- **The ledger sha is never written in the commit it describes.** The task commit is made and its sha becomes final; then the ledger row is written in a separate `[ledger]` commit. Two commits per task, always.
+
 
 ### Tags
 
@@ -391,7 +392,7 @@ You are implementing ONE task from a task card. Rules:
 
 ---
 
-## 11. Execution Protocol — Amendment 11 (Rev 2)
+## 11. Execution Protocol — Amendment 11 (Rev 3)
 
 Effective from `M1-T08c` onward.
 
@@ -476,21 +477,17 @@ When a task changes a shared entry point, the Definition of Done must include re
 
 Green tests after a shared-entry-point change prove less than they appear to. Ask which earlier acceptance script still passes.
 
-### 11.7 Enforcement
+### 11.7 Scope tags and enforcement
 
-`scripts/hooks/no_card_self_edit.py` runs at the `commit-msg` stage. It extracts the task id from the `[M<n>-T<id>]` tag in the commit message and rejects the commit if the staged file list includes `docs/tasks/<that id>.md`.
+Every non-merge commit must carry exactly one recognised scope tag in its subject:
 
-Add to `.pre-commit-config.yaml`:
+| Tag | Meaning | Files that may be staged |
+|---|---|---|
+| `[M<n>-T<id>]` | Task work | The card's allowlist, plus `docs/LEDGER.md` |
+| `[ledger]` | Ledger bookkeeping only | `docs/LEDGER.md` |
+| `[protocol]` | Protocol and card text only | `EXECUTION_PROTOCOL.md`, `docs/PROTOCOL_AMENDMENT_*.md`, `docs/tasks/*.md` |
 
-```yaml
-  - repo: local
-    hooks:
-      - id: no-card-self-edit
-        name: task cards are immutable during their own task
-        entry: python3 scripts/hooks/no_card_self_edit.py
-        language: system
-        stages: [commit-msg]
-```
+Enforced by `scripts/hooks/task_id_required.py` and `scripts/hooks/files_within_allowlist.py` at the `commit-msg` stage.
 
 ### 11.8 Staged files must fall within the card's allowlist
 
@@ -501,6 +498,31 @@ The allowlist is read from the card **as committed in HEAD**, never from the wor
 Work that does not fit belongs in a separate chore commit. Protocol scaffolding, hook installation, and documentation restructuring are chore work, not task work.
 
 Enforced by `scripts/hooks/files_within_allowlist.py` at the `commit-msg` stage.
+
+### 11.9 `--no-verify` is prohibited
+
+`--no-verify` is prohibited. If a hook blocks a commit, fix the commit or fix the hook under a card in its own commit.
+Prohibition is checked by:
+1. `scripts/check_hooks_installed.py` as the first step of `make check`.
+2. `scripts/audit_commits.py` at every milestone close to audit historical commits.
+
+### 11.10 Working-tree gate without committing
+
+`make gate` runs the identical set of checks the hooks run against the working tree without creating a commit:
+
+```make
+gate:
+	python3 scripts/check_hooks_installed.py
+	python3 -m ruff format --check src tests scripts
+	python3 -m ruff check src tests scripts
+	python3 -m mypy --strict src/npc_planner
+	python3 -m pytest tests/unit -q
+	python3 -m pytest tests/integration -q
+	python3 scripts/check_schema_manifest.py
+	python3 -m pre_commit run --all-files
+```
+
+Note `ruff format --check` and `ruff check` with no `--fix`. Edit until `make gate` is green, then `git add`, then commit once. If you have amended more than twice, stop and report instead of continuing.
 
 ---
 
