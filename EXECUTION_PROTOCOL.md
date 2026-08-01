@@ -545,6 +545,28 @@ A commit may not modify a guard that gates that commit. Enforcement scripts - an
 
 Row `M1-T00z` in `docs/LEDGER.md` is a permanent sentinel reserved for `open_tag_accepted` acceptance probes across all tasks. Its status MUST remain `todo` and it MUST NEVER be marked `done` or completed by any commit or task.
 
+### 11.15 A failing check is evidence, not an obstacle
+
+When a check, guard, test, or acceptance probe fails, the failure is **evidence** of a defect in the code, the fixture, the specification, or the check itself — not an obstacle to be removed.
+
+Rules:
+1. If the **code** is wrong, fix the code; the check stays.
+2. If the **fixture** disagrees with the source of truth (upstream ROM), the fixture is wrong. Fix the fixture; the parser must not be widened to match a defective fixture.
+3. If the **check** is wrong, fix the check under a new card that names it. A check cannot be widened inside the task whose check fired.
+4. If the **spec** is wrong, update the spec first, then the code and checks follow.
+
+Any commit whose diff modifies both an assertion and the code that assertion covers must carry a trailer:
+
+    Root-cause: code | check | fixture | spec
+
+stating which artefact was wrong. `audit_commits.py` verifies trailer presence on such commits.
+
+Widening a parser, guard, scope, or fixture so that a previously-failing check passes is a violation of this rule. The widening requires a **new task card** — it cannot be self-authorised inside the task whose check fired.
+
+### 11.16 Fixture fidelity
+
+`tests/fixtures/fake_rom/` is a faithful miniature of upstream. Every record in it must be something the real ROM could contain — real field names, real symbol names, realistic values, correct macro conventions (`COMPOUND_STRING` for moves, `_()` for species). Synthetic edge cases — missing keys, malformed values, unresolved expressions, fictional field names — belong in **inline fixture strings** inside the unit test that needs them, never in `fake_rom/`. If `audit_*_coverage` against `fake_rom` returns a clean bill, it must mean the fixture genuinely exercises the parser against realistic data, not that the parser was widened to match fiction.
+
 ---
 
 ## Appendix A — Task Count Estimate
