@@ -22,7 +22,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T06 | done | c2943c1 | check ✅ | `db/models.py`: Pydantic row models for the 26 domain tables |
 | M1-T07 | done | 44fa31c | check ✅ | `tests/fixtures/fake_rom/`: fake expansion repo fixture tree |
 | M1-T08 | todo | — | — | `rom_probe.py` + `preprocess_rom.py`: ROM layout probe, git pinning, cpp harness |
-| M1-T09 | todo | — | — | `cparse.py`: designated-initializer C parser |
+| M1-T09 | done | pending | check ✅ | `cparse.py`: designated-initializer C parser |
 | M1-T10 | todo | — | — | `ingest/rom_config.py`: config-header reader (`B_*`, `P_*`, limits, AI flags) |
 | M1-T11 | todo | — | — | `ingest/extract/species.py`: species and forms extractor |
 | M1-T12 | todo | — | — | `ingest/extract/moves.py`: moves extractor |
