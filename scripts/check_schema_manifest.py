@@ -29,8 +29,8 @@ EXPECTED_STAGING_COUNT = 5
 
 def main() -> int:
     if not SCHEMA.exists():
-        print(f"schema.sql not yet created ({SCHEMA}), scheduled for M1-T03")
-        return 0
+        print(f"FAIL: missing {SCHEMA}")
+        return 1
     if not MANIFEST.exists():
         print(f"FAIL: missing {MANIFEST}")
         return 1
@@ -49,19 +49,12 @@ def main() -> int:
     missing = sorted(in_manifest - in_sql)
     extra = sorted(in_sql - in_manifest)
 
-    # Allow staging tables to be added in M1-T04
-    missing_staging = [m for m in missing if m.startswith("stg_")]
-    missing_domain = [m for m in missing if not m.startswith("stg_")]
-
-    if missing_domain:
-        errors.append(
-            f"domain tables declared in manifest but absent from schema.sql: {missing_domain}"
-        )
+    if missing:
+        errors.append(f"declared in manifest but absent from schema.sql: {missing}")
     if extra:
         errors.append(f"present in schema.sql but absent from manifest: {extra}")
 
-    # Views added in M1-T04
-    if views_in_sql and views_in_sql != EXPECTED_VIEWS:
+    if views_in_sql != EXPECTED_VIEWS:
         errors.append(
             f"views mismatch: schema.sql has {sorted(views_in_sql)}, "
             f"expected {sorted(EXPECTED_VIEWS)}"
@@ -73,11 +66,7 @@ def main() -> int:
         errors.append(
             f"expected {EXPECTED_DOMAIN_COUNT} domain tables, manifest lists {len(domain)}"
         )
-    if missing_staging:
-        print(
-            f"info: {len(missing_staging)} staging tables scheduled for M1-T04: {missing_staging}"
-        )
-    elif len(staging) != EXPECTED_STAGING_COUNT:
+    if len(staging) != EXPECTED_STAGING_COUNT:
         errors.append(
             f"expected {EXPECTED_STAGING_COUNT} staging tables, manifest lists {len(staging)}"
         )
@@ -88,7 +77,10 @@ def main() -> int:
             print(f"  - {e}")
         return 1
 
-    print(f"schema manifest OK: {len(domain)} domain tables verified in schema.sql")
+    print(
+        f"schema manifest OK: {len(domain)} domain + {len(staging)} staging "
+        f"+ {len(views_in_sql)} views"
+    )
     return 0
 
 
