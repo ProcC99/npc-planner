@@ -10,7 +10,7 @@ import re
 import sys
 from pathlib import Path
 
-TASK_RE = re.compile(r"\[M[1-6]-T\d{2}\]")
+TASK_RE = re.compile(r"\[M[1-6]-T\d{2}[a-z]?\]")
 TYPE_RE = re.compile(r"^(feat|fix|test|refactor|chore|docs|data|revert)\([a-z]+\): .+")
 EXEMPT_PREFIXES = ("Merge ", "Revert ", "fixup!", "squash!")
 

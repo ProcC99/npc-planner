@@ -70,3 +70,8 @@ repos:
         language: system
         stages: [commit-msg]
 
+      - id: files-within-allowlist
+        name: staged files must fall within the task card allowlist
+        entry: python3 scripts/hooks/files_within_allowlist.py
+        language: system
+        stages: [commit-msg]
