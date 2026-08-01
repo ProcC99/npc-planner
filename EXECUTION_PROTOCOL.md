@@ -108,7 +108,7 @@ main                  # always green, always releasable
 
 - `main` is protected. Nothing lands on it except a milestone merge.
 - A milestone branch merges to `main` only when its **milestone gate** (§4) passes.
-- Task branches are squash-merged into the milestone branch. One task = one commit on the milestone branch.
+- A task branch merges into its milestone with `--squash` when it contains a single commit, or `--ff-only` when it is linear and every commit carries a valid scope tag. Merge commits are never created. The reviewable unit is the tagged commit, not the merge.
 
 ### Commit message format
 
@@ -532,6 +532,10 @@ Note `ruff format --check` and `ruff check` with no `--fix`. Edit until `make ga
 ### 11.11 CI scope
 
 Changes to CI mechanism files - `.pre-commit-config.yaml`, `Makefile`, `.github/` - are tagged `[ci]`. A `[ci]` commit must touch only those paths and must add a dated line to `docs/LEDGER.md` naming what changed and why. `.pre-commit-config.yaml` is **not** part of `[protocol]` scope: a protocol commit edits the rules as written, never the machinery that enforces them.
+
+### 11.12 Frozen acceptance scripts
+
+Once a task is recorded `done`, its acceptance script is frozen. If a defect is found in it, the correction is made under the **next** task's allowlist and noted in that task's ledger row. Acceptance scripts are never edited under `[protocol]` or `[ci]`, and never under the tag of the completed task.
 
 ---
 
