@@ -27,7 +27,7 @@ def main() -> None:
         repo_path = resolve_rom_repo(explicit=args.repo)
     except RomRepoNotFoundError as e:
         print(f"[FAIL] Environment Resolution Error:\n{e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(2)
 
     print(f"Checking environment for ROM repository: {repo_path}\n")
 
@@ -46,7 +46,10 @@ def main() -> None:
         print()
 
     if hard_fail:
-        print("Environment check FAILED: hard requirement(s) missing.", file=sys.stderr)
+        print(
+            "Environment check FAILED: hard requirement(s) missing.",
+            file=sys.stderr,
+        )
         sys.exit(1)
     else:
         print("Environment check PASSED.")

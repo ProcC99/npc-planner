@@ -15,6 +15,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | Task | Status | Commit | Gate | Description |
 |---|---|---|---|---|
 | M1-T00 | done | fedd831 | check ✅ | `environment.py` + `scripts/doctor.py`: environment doctor & ROM repo resolution |
+| M1-T00b | done | pending | check ✅ | `environment.py` + `scripts/doctor.py`: explicit severity model, exit contract & shared fixtures |
 | M1-T01 | done | af35512 | check ✅ | `pyproject.toml` + package init + `config.py` path resolution |
 | M1-T02 | done | c3e21f3 | check ✅ | `models/envelope.py`: generic `Envelope[T]` + its unit tests |
 | M1-T03 | done | 817e7fa | check ✅ | `db/schema.sql`: 26 domain tables (DDL only, no views) |
@@ -23,6 +24,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T06 | done | c2943c1 | check ✅ | `db/models.py`: Pydantic row models for the 26 domain tables |
 | M1-T07 | done | 44fa31c | check ✅ | `tests/fixtures/fake_rom/`: fake expansion repo fixture tree |
 | M1-T08 | done | 78ac4df | check ✅ | `rom_probe.py` + `preprocess_rom.py`: ROM layout probe, git pinning, cpp harness |
+| M1-T08b | todo | — | — | `preprocess_rom.py`: route repo resolution through environment & preflight check exit 3 |
 | M1-T09 | done | 15feb07 | check ✅ | `cparse.py`: designated-initializer C parser |
 | M1-T10 | todo | — | — | `ingest/rom_config.py`: config-header reader (`B_*`, `P_*`, limits, AI flags) |
 | M1-T11 | todo | — | — | `ingest/extract/species.py`: species and forms extractor |
