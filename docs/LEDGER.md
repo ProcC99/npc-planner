@@ -14,6 +14,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 
 | Task | Status | Commit | Gate | Description |
 |---|---|---|---|---|
+| M1-T00 | done | pending | check ✅ | `environment.py` + `scripts/doctor.py`: environment doctor & ROM repo resolution |
 | M1-T01 | done | af35512 | check ✅ | `pyproject.toml` + package init + `config.py` path resolution |
 | M1-T02 | done | c3e21f3 | check ✅ | `models/envelope.py`: generic `Envelope[T]` + its unit tests |
 | M1-T03 | done | 817e7fa | check ✅ | `db/schema.sql`: 26 domain tables (DDL only, no views) |
