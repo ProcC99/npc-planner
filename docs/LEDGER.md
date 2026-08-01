@@ -18,7 +18,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T02 | done | c3e21f3 | check ✅ | `models/envelope.py`: generic `Envelope[T]` + its unit tests |
 | M1-T03 | done | 817e7fa | check ✅ | `db/schema.sql`: 26 domain tables (DDL only, no views) |
 | M1-T04 | done | b75a15c | check ✅ | `db/schema.sql`: 5 staging tables + 2 views + `docs/schema_manifest.txt` |
-| M1-T05 | todo | — | — | `db/session.py`: connection factory, WAL, `foreign_keys=ON` |
+| M1-T05 | done | pending | check ✅ | `db/session.py`: connection factory, WAL, `foreign_keys=ON` |
 | M1-T06 | todo | — | — | `db/models.py`: Pydantic row models for the 26 domain tables |
 | M1-T07 | todo | — | — | `tests/fixtures/m1_tiny/`: 10-species fixture dataset (data authoring) |
 | M1-T08 | todo | — | — | `scripts/fetch_baseline.py`: network-isolated dump fetcher |
