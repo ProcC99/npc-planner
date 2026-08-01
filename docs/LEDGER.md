@@ -32,6 +32,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T10 | done | 1487f98 | check ✅ | `ingest/rom_config.py`: config-header reader (`B_*`, `P_*`, limits, AI flags) |
 | M1-T10b | done | 2fe6d25 | check ✅ | `ingest/rom_config.py`: correct config reader bucketing & symbol coverage |
 | M1-T11 | done | c645dff | check ✅ | `species.py`: parse gSpeciesInfo into SpeciesRecord + done-tag fail-open notification |
+| M1-T11b | done | 370fe82 | check ✅ | re-source coverage guard, capture required species fields, self-gating guard protection |
 | M1-T12 | todo | — | — | `ingest/extract/moves.py`: moves extractor |
 | M1-T13 | todo | — | — | `ingest/extract/abilities.py`: abilities extractor |
 | M1-T14 | todo | — | — | `ingest/extract/types.py`: types and matchup-matrix extractor |
