@@ -27,6 +27,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T08b | done | 7e74720 | check ✅ | `preprocess_rom.py`: route repo resolution through environment & preflight check exit 3 |
 | M1-T08c | done | 9abb6e8 | check ✅ | `environment.py` + `preprocess_rom.py`: scope preprocess preflight, git-optional pinning |
 | M1-T08d | done | 0e999bc | check ✅ | `files_within_allowlist.py`: enforce card allowlist, derivable manifest count |
+| M1-T08e | done | ef6e0c6 | check ✅ | `task_id_required.py` + `files_within_allowlist.py`: close untagged loophole, make gate, history audit |
 | M1-T09 | done | 15feb07 | check ✅ | `cparse.py`: designated-initializer C parser |
 | M1-T10 | todo | — | — | `ingest/rom_config.py`: config-header reader (`B_*`, `P_*`, limits, AI flags) |
 | M1-T11 | todo | — | — | `ingest/extract/species.py`: species and forms extractor |
@@ -44,23 +45,24 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T23 | todo | — | — | `ingest/build.py`: build orchestrator and `planner.db.lock.json` writer |
 | M1-T24 | todo | — | — | `cli/main.py`: CLI stub (`data build`, `pokemon show`) |
 
-## M2 — Overlay Engine & Baseline Diffing  → tag `m2-overlay`
+---
 
-| Task | Status | Commit | Gate | Description |
-|---|---|---|---|---|
-| M2-T01 | todo | — | — | `ingest/overlay.py`: YAML envelope header parse + schema validation |
-| M2-T02 | todo | — | — | 5-layer precedence merge + per-field provenance stamping |
-| M2-T03 | todo | — | — | `diff_against_upstream()` via `git show` |
-| M2-T04 | todo | — | — | `cli/commands/diff_upstream.py` + smoke test |
+## Known Historical Violations (Audited by M1-T08e)
 
-## M3 — Ruleset Chain & Legality Engine  → tag `m3-legality`
+These pre-T08e commits contained scope or allowlist violations when checked retrospectively by `scripts/audit_commits.py`.
+Per Amendment 11, history is not rewritten; violations are recorded here for transparency.
 
-| Task | Status | Commit | Gate | Description |
-|---|---|---|---|---|
-| M3-T01 | todo | — | — | 3 ruleset YAML files (data authoring) |
-| M3-T02 | todo | — | — | `rules/ruleset.py`: `resolve()` extends chain, cycle + missing-parent errors |
-| M3-T03 | todo | — | — | `resolve_damage_class()` across the 3 damage-class models |
-| M3-T04 | todo | — | — | `rules/context.py`: `LegalityContext` builder |
-| M3-T05 | todo | — | — | `legality.py` dimensions 1–6 (implementation & availability) |
-| M3-T06 | todo | — | — | `legality.py` dimensions 7–12 (AI, tech, uncertainty, bans, gates) |
-| M3-T07 | todo | — | — | `LegalityVerdict` + `LegalityFailure` suggestion strings |
+- `7b86b79` (M1-T01): touched files outside allowlist (`.gitignore`, `Makefile`, `README.md`, `docs/schema_manifest.txt`, `docs/tasks/M3-T02.md`, `scripts/check_schema_manifest.py`, `scripts/hooks/*`, `tests/integration/test_init.py`)
+- `f02628d` (M1-T03): touched file outside allowlist (`scripts/check_schema_manifest.py`)
+- `a911ccb` (M1-T04): touched file outside allowlist (`tests/unit/test_schema_ddl.py`)
+- `bec24b7`: untagged commit
+- `9544c72`: untagged commit (`docs(tasks): add task cards for M1-T10, M1-T11, M1-T12`)
+- `141b6d7` (M1-T07): touched files outside allowlist (`docs/tasks/M1-T08.md`, `docs/tasks/M1-T09.md`)
+- `5782db7` (M1-T00): touched files outside allowlist (`docs/PREREQUISITES.md`, `src/npc_planner/config.py`)
+- `837226f`: untagged commit
+- `d45f410` (M1-T00b): touched file outside allowlist (`docs/tasks/M1-T08b.md`)
+- `0d561ef` (M1-T08b): touched file outside allowlist (`scripts/doctor.py`)
+- `eb67381` (M1-T08c): tagged `[M1-T08c]` but card `docs/tasks/M1-T08c.md` was not committed in tree
+- `3d68f61`: untagged commit (`docs(tasks): commit M1-T08c and M1-T08d cards`)
+- `872e751`: untagged commit (`fixup! update task_id_required to support task letter suffixes`)
+- `052b862`: untagged commit (`fixup! add M1-T08e card`)
