@@ -14,6 +14,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 
 | Task | Status | Commit | Gate | Description |
 |---|---|---|---|---|
+| M1-T00z | todo | — | — | sentinel row, never mark done |
 | M1-T00 | done | fedd831 | check ✅ | `environment.py` + `scripts/doctor.py`: environment doctor & ROM repo resolution |
 | M1-T00b | done | 990edc9 | check ✅ | `environment.py` + `scripts/doctor.py`: explicit severity model, exit contract & shared fixtures |
 | M1-T01 | done | af35512 | check ✅ | `pyproject.toml` + package init + `config.py` path resolution |
@@ -34,7 +35,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T11 | done | c645dff | check ✅ | `species.py`: parse gSpeciesInfo into SpeciesRecord + done-tag fail-open notification |
 | M1-T11b | done | 370fe82 | check ✅ | re-source coverage guard, capture required species fields, self-gating guard protection |
 | M1-T11c | done | 9acc29e | check ✅ | record symbol values in unparsed_fields and fix acceptance probes |
-| M1-T12 | todo | — | — | `ingest/extract/moves.py`: moves extractor |
+| M1-T12 | done | b384966 | check ✅ | moves extractor & ingest protocol refactoring |
 | M1-T13 | todo | — | — | `ingest/extract/abilities.py`: abilities extractor |
 | M1-T14 | todo | — | — | `ingest/extract/types.py`: types and matchup-matrix extractor |
 | M1-T15 | todo | — | — | `ingest/extract/learnsets_levelup.py`: level-up learnset extractor |
