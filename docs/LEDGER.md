@@ -19,7 +19,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T03 | done | 817e7fa | check ✅ | `db/schema.sql`: 26 domain tables (DDL only, no views) |
 | M1-T04 | done | b75a15c | check ✅ | `db/schema.sql`: 5 staging tables + 2 views + `docs/schema_manifest.txt` |
 | M1-T05 | done | 641e5f6 | check ✅ | `db/session.py`: connection factory, WAL, `foreign_keys=ON` |
-| M1-T06 | todo | — | — | `db/models.py`: Pydantic row models for the 26 domain tables |
+| M1-T06 | done | c2943c1 | check ✅ | `db/models.py`: Pydantic row models for the 26 domain tables |
 | M1-T07 | todo | — | — | `tests/fixtures/m1_tiny/`: 10-species fixture dataset (data authoring) |
 | M1-T08 | todo | — | — | `scripts/fetch_baseline.py`: network-isolated dump fetcher |
 | M1-T09 | todo | — | — | `ingest/baseline.py`: disk-only load of raw dumps into `stg_*` |
