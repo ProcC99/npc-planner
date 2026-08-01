@@ -1,0 +1,6 @@
+# Machine-specific configuration paths for NPC Team Planner
+# Copy to config/paths.yml and customize for your local environment
+
+rom_repo: /home/jpurple/workish/pokeemerald-expansion
+upstream_sha: null
+cpp: cpp
