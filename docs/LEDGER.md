@@ -16,7 +16,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 |---|---|---|---|---|
 | M1-T01 | done | af35512 | check ✅ | `pyproject.toml` + package init + `config.py` path resolution |
 | M1-T02 | done | c3e21f3 | check ✅ | `models/envelope.py`: generic `Envelope[T]` + its unit tests |
-| M1-T03 | todo | — | — | `db/schema.sql`: 26 domain tables (DDL only, no views) |
+| M1-T03 | done | 817e7fa | check ✅ | `db/schema.sql`: 26 domain tables (DDL only, no views) |
 | M1-T04 | todo | — | — | `db/schema.sql`: 5 staging tables + 2 views + `docs/schema_manifest.txt` |
 | M1-T05 | todo | — | — | `db/session.py`: connection factory, WAL, `foreign_keys=ON` |
 | M1-T06 | todo | — | — | `db/models.py`: Pydantic row models for the 26 domain tables |
