@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -20,6 +21,20 @@ CHECK_SEVERITY: dict[str, Severity] = {
 EXPANSION_MARKERS: tuple[str, ...] = (
     "include/config/species_enabled.h",
     "include/config/battle.h",
+)
+
+# Checks that must pass before it is safe to run `cpp` over a tree.
+# Git is deliberately absent: preprocessing reads files, it does not read history.
+PREPROCESS_REQUIRED: tuple[str, ...] = (
+    "cpp",
+    "repo_present",
+    "expansion_markers",
+)
+
+# Checks that must pass before a build may claim to be reproducibly pinned.
+PINNING_REQUIRED: tuple[str, ...] = (
+    "repo_present",
+    "is_git_repo",
 )
 
 
@@ -137,7 +152,7 @@ def check_repo_present(repo_path: Path) -> CheckResult:
 def check_is_git_repo(repo_path: Path) -> CheckResult:
     p = repo_path.resolve()
     severity = CHECK_SEVERITY["is_git_repo"]
-    if (p / ".git").exists() or (p / "HEAD").exists():
+    if (p / ".git").exists():
         return CheckResult(
             name="is_git_repo",
             ok=True,
@@ -147,17 +162,17 @@ def check_is_git_repo(repo_path: Path) -> CheckResult:
         )
     try:
         res = subprocess.run(
-            ["git", "-C", str(p), "rev-parse", "--is-inside-work-tree"],
+            ["git", "-C", str(p), "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
             check=False,
         )
-        if res.returncode == 0 and "true" in res.stdout.strip():
+        if res.returncode == 0 and Path(res.stdout.strip()).resolve() == p:
             return CheckResult(
                 name="is_git_repo",
                 ok=True,
                 severity=severity,
-                detail=f"Directory '{p}' is inside a Git work tree",
+                detail=f"Directory '{p}' is a Git repository root",
                 remedy=None,
             )
     except (subprocess.SubprocessError, FileNotFoundError, OSError):
@@ -253,18 +268,22 @@ def check_tree_clean(repo_path: Path) -> CheckResult:
     )
 
 
-def run_all(repo_path: Path, cpp: str = "cpp") -> list[CheckResult]:
-    """Run every check. Never raises; failures are reported as CheckResult rows."""
+def run_checks(
+    repo_path: Path,
+    names: Sequence[str],
+    cpp: str = "cpp",
+) -> list[CheckResult]:
+    """Run only the named checks, in the order given.
+
+    Raises KeyError if any name is not a key of CHECK_SEVERITY.
+    Never raises for check failures; those are returned as CheckResult rows.
+    """
     results: list[CheckResult] = []
 
-    for name in (
-        "cpp",
-        "repo_present",
-        "is_git_repo",
-        "expansion_markers",
-        "upstream_remote",
-        "tree_clean",
-    ):
+    for name in names:
+        if name not in CHECK_SEVERITY:
+            raise KeyError(f"Unknown check name: {name}")
+
         try:
             if name == "cpp":
                 res = check_cpp(cpp)
@@ -276,8 +295,10 @@ def run_all(repo_path: Path, cpp: str = "cpp") -> list[CheckResult]:
                 res = check_expansion_markers(repo_path)
             elif name == "upstream_remote":
                 res = check_upstream_remote(repo_path)
-            else:
+            elif name == "tree_clean":
                 res = check_tree_clean(repo_path)
+            else:
+                raise KeyError(f"Unhandled check name: {name}")
             results.append(res)
         except (OSError, RuntimeError, ValueError) as e:
             results.append(
@@ -291,3 +312,8 @@ def run_all(repo_path: Path, cpp: str = "cpp") -> list[CheckResult]:
             )
 
     return results
+
+
+def run_all(repo_path: Path, cpp: str = "cpp") -> list[CheckResult]:
+    """Equivalent to run_checks(repo_path, tuple(CHECK_SEVERITY), cpp)."""
+    return run_checks(repo_path, tuple(CHECK_SEVERITY), cpp=cpp)

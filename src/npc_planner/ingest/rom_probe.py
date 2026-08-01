@@ -4,13 +4,26 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-class RomLayoutUnknownError(RuntimeError):
-    """Raised when no known expansion layout matches the repo. Error code E_ROM_LAYOUT_UNKNOWN."""
+class RomLayoutUnknownError(ValueError):
+    """Raised when an expansion tree cannot be mapped to a layout specification."""
+
+
+@dataclass(frozen=True)
+class RomPin:
+    repo_path: Path
+    hack_sha: str | None
+    hack_dirty: bool
+    upstream_remote: str | None
+    upstream_sha: str | None
+    expansion_version: str | None
+    pinned: bool
 
 
 @dataclass(frozen=True)
 class RomLayout:
-    species_info: list[Path]
+    layout_id: str
+    config_headers: tuple[Path, ...]
+    species_info: tuple[Path, ...]
     moves_info: Path
     abilities: Path
     types_info: Path
@@ -18,165 +31,143 @@ class RomLayout:
     level_up_learnsets: Path
     teachable_learnsets: Path
     egg_moves: Path
-    wild_encounters_json: Path
+    wild_encounters: Path
     trainers: Path
-    trainers_format: str
-    config_headers: list[Path]
-    layout_id: str
-
-
-@dataclass(frozen=True)
-class RomPin:
-    repo_path: Path
-    hack_sha: str
-    hack_dirty: bool
-    upstream_remote: str | None
-    upstream_sha: str | None
-    expansion_version: str | None
+    trainers_format: str  # "party" | "json"
 
 
 def probe_layout(repo_path: Path) -> RomLayout:
-    """Detect which expansion layout this repo uses.
+    p = repo_path.resolve()
 
-    Raises RomLayoutUnknownError listing which expected paths were missing.
-    Never guesses: if species data cannot be located, it raises.
-    """
-    repo = Path(repo_path).resolve()
-    missing: list[str] = []
+    species_h = p / "src" / "data" / "pokemon" / "species_info.h"
+    moves_h = p / "src" / "data" / "moves_info.h"
+    abilities_h = p / "src" / "data" / "abilities.h"
+    types_h = p / "src" / "data" / "types_info.h"
+    items_h = p / "src" / "data" / "items.h"
+    levelup_h = p / "src" / "data" / "pokemon" / "level_up_learnsets.h"
+    teachable_h = p / "src" / "data" / "pokemon" / "teachable_learnsets.h"
+    egg_h = p / "src" / "data" / "pokemon" / "egg_moves.h"
 
-    # Check species info
-    species_single = repo / "src/data/pokemon/species_info.h"
-    species_multi = list(repo.glob("src/data/pokemon/species_info/*.h"))
+    wild_json = p / "src" / "data" / "wild_encounters.json"
+    trainers_party = p / "src" / "data" / "trainers.party"
+    trainers_json = p / "src" / "data" / "trainers.json"
 
-    species_files: list[Path] = []
-    if species_single.exists():
-        species_files = [species_single]
-    elif species_multi:
-        species_files = species_multi
-    else:
-        missing.append("src/data/pokemon/species_info.h or species_info/*.h")
-
-    # Moves info
-    moves = repo / "src/data/moves_info.h"
-    if not moves.exists():
-        moves = repo / "src/data/battle_moves.h"
-    if not moves.exists():
-        missing.append("src/data/moves_info.h")
-
-    # Abilities
-    abilities = repo / "src/data/abilities.h"
-    if not abilities.exists():
-        missing.append("src/data/abilities.h")
-
-    # Types info
-    types = repo / "src/data/types_info.h"
-    if not types.exists():
-        types = repo / "src/battle_main.c"
-    if not types.exists():
-        missing.append("src/data/types_info.h")
-
-    # Items
-    items = repo / "src/data/items.h"
-    if not items.exists():
-        missing.append("src/data/items.h")
-
-    # Learnsets
-    lvl = repo / "src/data/pokemon/level_up_learnsets.h"
-    if not lvl.exists():
-        missing.append("src/data/pokemon/level_up_learnsets.h")
-
-    teach = repo / "src/data/pokemon/teachable_learnsets.h"
-    if not teach.exists():
-        missing.append("src/data/pokemon/teachable_learnsets.h")
-
-    egg = repo / "src/data/pokemon/egg_moves.h"
-    if not egg.exists():
-        missing.append("src/data/pokemon/egg_moves.h")
-
-    # Wild encounters
-    wild = repo / "src/data/wild_encounters.json"
-    if not wild.exists():
-        missing.append("src/data/wild_encounters.json")
-
-    # Trainers
-    trainers = repo / "src/data/trainers.party"
-    trainers_fmt = "party"
-    if not trainers.exists():
-        trainers = repo / "src/data/trainers.h"
-        trainers_fmt = "c_headers"
-    if not trainers.exists():
-        missing.append("src/data/trainers.party or trainers.h")
-
+    essential_files = [
+        species_h,
+        moves_h,
+        abilities_h,
+        types_h,
+        items_h,
+        levelup_h,
+        teachable_h,
+        egg_h,
+        wild_json,
+    ]
+    missing = [f for f in essential_files if not f.exists()]
     if missing:
+        missing_str = ", ".join(str(f.relative_to(p)) for f in missing)
         raise RomLayoutUnknownError(
-            f"Failed to probe ROM layout for '{repo}': missing expected files: {', '.join(missing)}"
+            f"Cannot detect ROM layout for '{p}': essential file(s) missing: {missing_str}"
         )
 
-    config_headers = [
-        p
-        for p in [
-            repo / "include/config/battle.h",
-            repo / "include/config/pokemon.h",
-            repo / "include/config/species_enabled.h",
-        ]
-        if p.exists()
-    ]
+    if trainers_party.exists():
+        t_path = trainers_party
+        t_fmt = "party"
+    elif trainers_json.exists():
+        t_path = trainers_json
+        t_fmt = "json"
+    else:
+        raise RomLayoutUnknownError(
+            f"Cannot detect ROM layout for '{p}': missing trainers.party or trainers.json"
+        )
+
+    cfg_dir = p / "include" / "config"
+    cfg_headers = (
+        cfg_dir / "battle.h",
+        cfg_dir / "pokemon.h",
+        cfg_dir / "species_enabled.h",
+    )
 
     return RomLayout(
-        species_info=species_files,
-        moves_info=moves,
-        abilities=abilities,
-        types_info=types,
-        items=items,
-        level_up_learnsets=lvl,
-        teachable_learnsets=teach,
-        egg_moves=egg,
-        wild_encounters_json=wild,
-        trainers=trainers,
-        trainers_format=trainers_fmt,
-        config_headers=config_headers,
         layout_id="expansion_1_9_plus",
+        config_headers=cfg_headers,
+        species_info=(species_h,),
+        moves_info=moves_h,
+        abilities=abilities_h,
+        types_info=types_h,
+        items=items_h,
+        level_up_learnsets=levelup_h,
+        teachable_learnsets=teachable_h,
+        egg_moves=egg_h,
+        wild_encounters=wild_json,
+        trainers=t_path,
+        trainers_format=t_fmt,
     )
 
 
 def read_pin(repo_path: Path) -> RomPin:
-    """Read git SHAs and dirty state via subprocess git calls."""
-    repo = Path(repo_path).resolve()
+    p = repo_path.resolve()
 
-    def run_git(args: list[str]) -> str | None:
-        try:
-            res = subprocess.run(
-                ["git", "-C", str(repo)] + args,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if res.returncode == 0:
-                return res.stdout.strip()
-        except (subprocess.SubprocessError, FileNotFoundError, OSError):
-            return None
-        return None
+    def run_git(args: list[str]) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(p)] + args,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
-    sha = run_git(["rev-parse", "HEAD"]) or "0000000000000000000000000000000000000000"
-    status = run_git(["status", "--porcelain"])
-    dirty = bool(status)
+    # Shell out to git to test if repo_path itself is the root of a Git repository
+    res_toplevel = run_git(["rev-parse", "--show-toplevel"])
+    if res_toplevel.returncode != 0 or Path(res_toplevel.stdout.strip()).resolve() != p:
+        return RomPin(
+            repo_path=p,
+            hack_sha=None,
+            hack_dirty=False,
+            upstream_remote=None,
+            upstream_sha=None,
+            expansion_version="unpinned",
+            pinned=False,
+        )
 
-    upstream_remote = run_git(["config", "--get", "remote.origin.url"])
-    upstream_sha = run_git(["rev-parse", "@{u}"])
+    res_status = run_git(["status", "--porcelain"])
+    hack_dirty = bool(res_status.stdout.strip())
 
-    version: str | None = None
-    exp_h = repo / "include/constants/expansion.h"
-    if exp_h.exists():
-        text = exp_h.read_text(encoding="utf-8")
-        m = re.search(r'#define\s+EXPANSION_VERSION\s+"([^"]+)"', text)
+    res_head = run_git(["rev-parse", "HEAD"])
+    hack_sha = res_head.stdout.strip() if res_head.returncode == 0 else None
+
+    res_remotes = run_git(["remote", "-v"])
+    upstream_remote: str | None = None
+    if res_remotes.returncode == 0 and "upstream" in res_remotes.stdout:
+        for line in res_remotes.stdout.splitlines():
+            if line.startswith("upstream"):
+                parts = line.split()
+                if len(parts) >= 2:
+                    upstream_remote = parts[1]
+                    break
+
+    upstream_sha: str | None = None
+    if upstream_remote:
+        res_ush = run_git(["rev-parse", "upstream/HEAD"])
+        if res_ush.returncode == 0:
+            upstream_sha = res_ush.stdout.strip()
+
+    expansion_version: str | None = None
+    exp_header = p / "include" / "constants" / "expansion.h"
+    if exp_header.exists():
+        txt = exp_header.read_text(encoding="utf-8")
+        m = re.search(r'#define\s+EXPANSION_VERSION\s+"([^"]+)"', txt)
         if m:
-            version = m.group(1)
+            expansion_version = m.group(1)
+
+    if not expansion_version:
+        expansion_version = "1.9.0+"
 
     return RomPin(
-        repo_path=repo,
-        hack_sha=sha,
-        hack_dirty=dirty,
+        repo_path=p,
+        hack_sha=hack_sha,
+        hack_dirty=hack_dirty,
         upstream_remote=upstream_remote,
         upstream_sha=upstream_sha,
-        expansion_version=version,
+        expansion_version=expansion_version,
+        pinned=True,
     )

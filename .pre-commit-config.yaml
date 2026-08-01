@@ -1,0 +1,72 @@
+# Enforcement layer. A low-cost model will not self-police; the hook must.
+# Install with: make hooks
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: check-yaml
+      - id: check-json
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: no-commit-to-branch
+        args: [--branch, main]
+
+  - repo: local
+    hooks:
+      - id: mypy-strict
+        name: mypy --strict
+        entry: python3 -m mypy --strict
+        language: system
+        types: [python]
+        files: ^src/npc_planner/
+
+      - id: schema-manifest
+        name: schema.sql matches docs/schema_manifest.txt
+        entry: python3 scripts/check_schema_manifest.py
+        language: system
+        pass_filenames: false
+        files: ^(src/npc_planner/db/schema\.sql|docs/schema_manifest\.txt)$
+
+      - id: no-test-deletion
+        name: refuse commits that delete tests
+        entry: python3 scripts/hooks/no_test_deletion.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: no-golden-edit
+        name: refuse golden edits mixed with source edits
+        entry: python3 scripts/hooks/no_golden_edit.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: no-placeholder-return
+        name: refuse stub-shaped returns in new code
+        entry: python3 scripts/hooks/no_placeholder_return.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: task-id-required
+        name: commit message must carry a task id
+        entry: python3 scripts/hooks/task_id_required.py
+        language: system
+        stages: [commit-msg]
+
+      - id: no-card-self-edit
+        name: task cards are immutable during their own task
+        entry: python3 scripts/hooks/no_card_self_edit.py
+        language: system
+        stages: [commit-msg]
+

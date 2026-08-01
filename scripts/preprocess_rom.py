@@ -8,9 +8,10 @@ import sys
 from pathlib import Path
 
 from npc_planner.environment import (
+    PREPROCESS_REQUIRED,
     RomRepoNotFoundError,
     resolve_rom_repo,
-    run_all,
+    run_checks,
 )
 from npc_planner.ingest.rom_probe import probe_layout, read_pin
 
@@ -50,13 +51,13 @@ def main() -> None:
         print(f"[FAIL] ROM Repo Resolution Error:\n{e}", file=sys.stderr)
         sys.exit(2)
 
-    # Preflight doctor check
-    results = run_all(repo, cpp=args.cpp)
+    # Preflight check using PREPROCESS_REQUIRED subset only
+    results = run_checks(repo, PREPROCESS_REQUIRED, cpp=args.cpp)
     hard_failures = [r for r in results if r.severity == "hard" and not r.ok]
 
     if hard_failures:
         print(
-            f"[FAIL] Preflight doctor check failed for '{repo}' ({len(hard_failures)} hard failure(s)):",
+            f"[FAIL] Preflight doctor check failed for '{repo}' ({len(hard_failures)} failure(s)):",
             file=sys.stderr,
         )
         for r in hard_failures:
@@ -65,11 +66,17 @@ def main() -> None:
                 print(f"    Remedy: {r.remedy}", file=sys.stderr)
         sys.exit(3)
 
+    pin = read_pin(repo)
+    if not pin.pinned:
+        print(
+            f"[WARN] Repository '{repo}' is not a Git repo; preprocessed output is unpinned.",
+            file=sys.stderr,
+        )
+
     output_dir = args.output.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     layout = probe_layout(repo)
-    pin = read_pin(repo)
 
     preprocessed_files: dict[str, str] = {}
 
@@ -127,6 +134,7 @@ def main() -> None:
 
     manifest_data = {
         "layout_id": layout.layout_id,
+        "pinned": pin.pinned,
         "pin": {
             "repo_path": str(pin.repo_path),
             "hack_sha": pin.hack_sha,
@@ -134,6 +142,7 @@ def main() -> None:
             "upstream_remote": pin.upstream_remote,
             "upstream_sha": pin.upstream_sha,
             "expansion_version": pin.expansion_version,
+            "pinned": pin.pinned,
         },
         "preprocessed": preprocessed_files,
     }
