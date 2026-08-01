@@ -393,3 +393,52 @@ CREATE TABLE validation_issues (
   detected_at TEXT NOT NULL
 );
 CREATE INDEX ix_issue_sev ON validation_issues(severity, code);
+
+-- ─────────── staging tables ───────────
+CREATE TABLE stg_species (
+  species_slug TEXT PRIMARY KEY,
+  species_name TEXT NOT NULL,
+  raw_payload  TEXT NOT NULL
+);
+
+CREATE TABLE stg_forms (
+  form_id     TEXT PRIMARY KEY,
+  species_slug TEXT NOT NULL,
+  raw_payload TEXT NOT NULL
+);
+
+CREATE TABLE stg_moves (
+  move_slug   TEXT PRIMARY KEY,
+  move_name   TEXT NOT NULL,
+  raw_payload TEXT NOT NULL
+);
+
+CREATE TABLE stg_abilities (
+  ability_slug TEXT PRIMARY KEY,
+  ability_name TEXT NOT NULL,
+  raw_payload  TEXT NOT NULL
+);
+
+CREATE TABLE stg_type_matchups (
+  attacking_type TEXT NOT NULL,
+  defending_type TEXT NOT NULL,
+  multiplier     REAL NOT NULL,
+  PRIMARY KEY (attacking_type, defending_type)
+);
+
+-- ─────────── convenience views ───────────
+CREATE VIEW v_form_full AS
+SELECT f.*, s.species_name, s.natdex_no,
+       (SELECT group_concat(a.ability_slug) FROM form_abilities a
+         WHERE a.form_id=f.form_id AND a.availability='regular') AS regular_abilities,
+       (SELECT a.ability_slug FROM form_abilities a
+         WHERE a.form_id=f.form_id AND a.availability='hidden' LIMIT 1) AS hidden_ability,
+       (SELECT group_concat(t.tag) FROM form_tags t WHERE t.form_id=f.form_id) AS tags
+FROM forms f JOIN species s USING (species_slug);
+
+CREATE VIEW v_battle_confidence AS
+SELECT entity_type, entity_key, MIN(confidence) AS entity_confidence
+FROM provenance
+WHERE field_path IN ('type_1','type_2','base_stats','abilities','power','accuracy',
+                     'damage_class','effect_id','multiplier')
+GROUP BY entity_type, entity_key;

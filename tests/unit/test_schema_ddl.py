@@ -20,7 +20,7 @@ def test_schema_ddl_execution() -> None:
             "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()
     ]
-    assert len(tables) == 26
+    assert len(tables) == 31
     assert "build_info" in tables
     assert "provenance" in tables
     assert "species" in tables
@@ -30,6 +30,7 @@ def test_schema_ddl_execution() -> None:
     assert "learnsets" in tables
     assert "trainer_specs" in tables
     assert "generated_teams" in tables
+    assert "stg_species" in tables
 
 
 def test_schema_ddl_pragmas() -> None:
