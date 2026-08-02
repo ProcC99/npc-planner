@@ -42,7 +42,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T12d | done | 372eb9a | check ✅ | fix CI branch filter, revert preprocessor strip, restore T12b checks, fix test_hooks python path |
 | M1-T12e | done | c84aabb | check ✅ | environment and suite integrity: fix CI gate, _lib.sh interpreter & count assertions, move ROM clone |
 | M1-T12f | done | dfd48a9 | check ✅ | bookkeeping and protocol: tag reconciliation, audit_commits first-parent & merge register, protocol 11.17 |
-| M1-T12g | todo | — | — | conditional C expression evaluation in moves/species initializers |
+| M1-T12g | in_progress | — | — | suite count reconciliation, M1-T10b re-integration & ratchet audit baseline |
 | M1-T13 | todo | — | — | `ingest/extract/abilities.py`: abilities extractor |
 | M1-T14 | todo | — | — | `ingest/extract/types.py`: types and matchup-matrix extractor |
 | M1-T15 | todo | — | — | `ingest/extract/learnsets_levelup.py`: level-up learnset extractor |
