@@ -54,7 +54,7 @@ KNOWN_VIOLATIONS: dict[str, str] = {
         ".split → .category rename was a fixture fidelity violation (T12b remediation)"
     ),
     "d5dbc2829285098ff302dd0012586e9feffb717b": (
-        "merge: integrate M1-T12d into milestone/M1 — merge commit created during T12d integration"
+        "merge: integrate M1-T12d into milestone/M1 — ratchet baseline SHA for active milestone commit auditing"
     ),
 }
 

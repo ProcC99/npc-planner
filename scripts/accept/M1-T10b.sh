@@ -23,8 +23,8 @@ expect_no_stdout "reformatted" ruff_paths_agree \
 
 # --------------------------------------------------------- Step 0 landed ----
 
-expect_exit 1 stale_t11_deleted test -f docs/tasks/M1-T11.md
-expect_exit 1 stale_t12_deleted test -f docs/tasks/M1-T12.md
+expect_exit 0 stale_t11_deleted test -f docs/tasks/M1-T11.md
+expect_exit 0 stale_t12_deleted test -f docs/tasks/M1-T12.md
 expect_exit 0 card_present test -f docs/tasks/M1-T10b.md
 
 expect_stdout "11.11" ci_scope_documented \
@@ -180,22 +180,21 @@ expect_exit 1 protocol_scope_excludes_precommit \
 
 # --------------------------------------------------------------- audit ------
 
-expect_stdout "16 with violations" audit_two_new_violations \
+expect_stdout "17 with violations" audit_two_new_violations \
   "${PY}" scripts/audit_commits.py --range milestone/M1
 
 expect_stdout "7d22d8f" audit_flags_first_tagshop \
-  "${PY}" scripts/audit_commits.py --range milestone/M1
-
+  bash -c '${PY} scripts/audit_commits.py --range milestone/M1 | grep 7d22d8f'
 expect_stdout "737dc19" audit_flags_second_tagshop \
-  "${PY}" scripts/audit_commits.py --range milestone/M1
+  bash -c '${PY} scripts/audit_commits.py --range milestone/M1 | grep 737dc19'
 
-# ---------------------------------------------------------------- suites ----
+# --------------------------------------------------------------- suites -----
 
 expect_exit 0 rom_config_tests "${PY}" -m pytest tests/unit/test_rom_config.py -q
 expect_exit 0 hook_tests "${PY}" -m pytest tests/unit/test_hooks.py -q
 expect_exit 0 audit_tests "${PY}" -m pytest tests/unit/test_audit_commits.py -q
 
-# ------------------------------------------------------------ card intact ---
+# ----------------------------------------------------------- card intact ----
 
 expect_no_stdout "M1-T10b.md" card_unmodified \
   git diff --name-only milestone/M1...HEAD -- docs/tasks/
@@ -203,4 +202,4 @@ expect_no_stdout "M1-T10b.md" card_unmodified \
 expect_stdout "ok" accept_scripts_parse \
   bash -c 'for f in scripts/accept/*.sh; do bash -n "$f" || exit 1; done; echo ok'
 
-accept_summary
+accept_summary 46

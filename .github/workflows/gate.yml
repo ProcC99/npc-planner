@@ -31,7 +31,7 @@ jobs:
         run: make gate
       - name: Acceptance suites
         run: |
-          for s in scripts/accept/M1-T11.sh scripts/accept/M1-T11b.sh scripts/accept/M1-T11c.sh scripts/accept/M1-T12.sh scripts/accept/M1-T12b.sh scripts/accept/M1-T12d.sh scripts/accept/M1-T12e.sh scripts/accept/M1-T12f.sh; do
+          for s in scripts/accept/M1-T10b.sh scripts/accept/M1-T11.sh scripts/accept/M1-T11b.sh scripts/accept/M1-T11c.sh scripts/accept/M1-T12.sh scripts/accept/M1-T12b.sh scripts/accept/M1-T12d.sh scripts/accept/M1-T12e.sh scripts/accept/M1-T12f.sh scripts/accept/M1-T12g.sh; do
             echo "=== RUNNING $s ==="
             bash "$s"; rc=$?
             if [ "$rc" -ne 0 ]; then
