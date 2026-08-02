@@ -62,26 +62,37 @@ def resolve_rom_repo(
     Precedence: explicit > env NPC_PLANNER_ROM_REPO > config/paths.yml rom_repo
               > sibling ../pokeemerald-expansion
     """
-    candidates: list[tuple[str, Path]] = []
-
-    if explicit is not None:
-        p_exp = Path(explicit).resolve()
-        candidates.append(("explicit CLI argument", p_exp))
-        if p_exp.exists() and p_exp.is_dir():
-            return p_exp
-
-    env_map = env if env is not None else {}
-    if env_map.get("NPC_PLANNER_ROM_REPO"):
-        p_env = Path(env_map["NPC_PLANNER_ROM_REPO"]).resolve()
-        candidates.append(("env NPC_PLANNER_ROM_REPO", p_env))
-        if p_env.exists() and p_env.is_dir():
-            return p_env
-
     root = (
         Path(planner_root).resolve()
         if planner_root
         else Path(__file__).resolve().parents[2]
     )
+
+    def _is_valid(p: Path) -> bool:
+        if not (p.exists() and p.is_dir()):
+            return False
+        return not (p == root or p == root / "pokeemerald-expansion")
+
+    candidates: list[tuple[str, Path]] = []
+
+    if explicit is not None:
+        p_exp = Path(explicit).resolve()
+        candidates.append(("explicit CLI argument", p_exp))
+        if _is_valid(p_exp):
+            return p_exp
+        attempted_str = "\n".join(f"  - {label}: {p}" for label, p in candidates)
+        raise RomRepoNotFoundError(
+            "Specified explicit ROM repository path is invalid or does not exist.\n"
+            f"Attempted location:\n{attempted_str}\n"
+        )
+
+    env_map = env if env is not None else {}
+    if env_map.get("NPC_PLANNER_ROM_REPO"):
+        p_env = Path(env_map["NPC_PLANNER_ROM_REPO"]).resolve()
+        candidates.append(("env NPC_PLANNER_ROM_REPO", p_env))
+        if _is_valid(p_env):
+            return p_env
+
     cfg_file = Path(config_path).resolve() if config_path else root / "config/paths.yml"
     if cfg_file.exists():
         try:
@@ -89,7 +100,7 @@ def resolve_rom_repo(
             if isinstance(data, dict) and data.get("rom_repo"):
                 p_cfg = Path(data["rom_repo"]).resolve()
                 candidates.append(("config/paths.yml key 'rom_repo'", p_cfg))
-                if p_cfg.exists() and p_cfg.is_dir():
+                if _is_valid(p_cfg):
                     return p_cfg
         except (OSError, yaml.YAMLError, ValueError):
             pass
@@ -98,7 +109,7 @@ def resolve_rom_repo(
     candidates.append(
         ("sibling directory convention '../pokeemerald-expansion'", p_sib)
     )
-    if p_sib.exists() and p_sib.is_dir():
+    if _is_valid(p_sib):
         return p_sib
 
     attempted_str = "\n".join(f"  - {label}: {p}" for label, p in candidates)

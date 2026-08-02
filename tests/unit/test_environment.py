@@ -175,7 +175,7 @@ def test_gitignore_contains_paths_yml() -> None:
 
 
 def test_resolve_rom_repo_no_os_environ() -> None:
-    planner_root = Path(__file__).resolve().parents[2]
+    planner_root = Path(__file__).resolve().parents[2] / "nonexistent_dir_xyz"
     with pytest.raises(RomRepoNotFoundError):
         resolve_rom_repo(
             env={},

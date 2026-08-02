@@ -14,6 +14,17 @@
 
 set -uo pipefail
 
+_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+if [ -d "$_REPO_ROOT/.venv/bin" ]; then
+    export PATH="$_REPO_ROOT/.venv/bin:$PATH"
+fi
+if [ -x "$_REPO_ROOT/.venv/bin/python3" ]; then
+    PY="$_REPO_ROOT/.venv/bin/python3"
+else
+    PY="$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null || command -v python3)"
+fi
+export PY
+
 _ACCEPT_PASS=0
 _ACCEPT_FAIL=0
 _ACCEPT_LOG="$(mktemp)"

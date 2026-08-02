@@ -21,7 +21,7 @@ jobs:
           pip install -e ".[dev]"
           pip install pre-commit
       - name: Install hooks
-        run: pre-commit install --install-hooks
+        run: make hooks
       - name: Fetch integration branch ref
         run: git fetch origin '+refs/heads/milestone/*:refs/heads/milestone/*' || true
       - name: Gate

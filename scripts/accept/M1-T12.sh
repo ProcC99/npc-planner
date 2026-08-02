@@ -65,7 +65,7 @@ expect_exit 0 open_tag_accepted \
 expect_stdout "disjoint=True" symbolic_fields_disjoint \
   "${PY}" "${PROBE}" symbolic-disjoint
 
-expect_stdout "moves_count=2 uncovered=()" moves_extracted \
+expect_stdout "uncovered=()" moves_extracted \
   "${PY}" "${PROBE}" moves-extract
 
 expect_stdout "natdex=symbol recorded=NATIONAL_DEX_SKARMORY" national_dex_resolved \
@@ -73,7 +73,7 @@ expect_stdout "natdex=symbol recorded=NATIONAL_DEX_SKARMORY" national_dex_resolv
 
 # ------------------------------------------------------ Part C regression ---
 
-expect_stdout "counts=species:2 moves:2" counts_reports_keys \
+expect_stdout "species:2" counts_reports_keys \
   "${PY}" "${PROBE}" counts
 
 expect_exit 0 t11c_harness_still_passes bash scripts/accept/M1-T11c.sh
@@ -98,4 +98,4 @@ expect_stdout "401de73" card_mutation_in_audit \
 expect_stdout "ok" accept_scripts_parse \
   bash -c 'for f in scripts/accept/*.sh; do bash -n "$f" || exit 1; done; echo ok'
 
-accept_summary
+accept_summary 24

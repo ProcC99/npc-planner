@@ -9,7 +9,7 @@ cd "${REPO}"
 # Use the absolute path so sys.executable is absolute in subprocess invocations
 PYTHON="${REPO}/.venv/bin/python3"
 if [ ! -x "${PYTHON}" ]; then
-  PYTHON="$(command -v python3)"
+  PYTHON="$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null || command -v python3)"
 fi
 
 PASS=0
