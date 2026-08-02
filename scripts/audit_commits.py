@@ -209,12 +209,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    rev_range = args.rev_range
+    if rev_range.startswith("main.."):
+        rc_check, _ = git("rev-parse", "--verify", "main")
+        if rc_check != 0:
+            rc_orig, _ = git("rev-parse", "--verify", "origin/main")
+            if rc_orig == 0:
+                rev_range = "origin/main" + rev_range[4:]
+
     cmd = ["log", "--format=%H"]
     if args.first_parent:
         cmd.append("--first-parent")
     else:
         cmd.append("--no-merges")
-    cmd.append(args.rev_range)
+    cmd.append(rev_range)
 
     rc, log = git(*cmd)
     if rc != 0:
