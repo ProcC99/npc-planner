@@ -53,6 +53,9 @@ KNOWN_VIOLATIONS: dict[str, str] = {
         "M1-T12 card mutated after initial commit — "
         ".split → .category rename was a fixture fidelity violation (T12b remediation)"
     ),
+    "d5dbc2829285098ff302dd0012586e9feffb717b": (
+        "merge: integrate M1-T12d into milestone/M1 — merge commit created during T12d integration"
+    ),
 }
 
 
@@ -199,9 +202,21 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Only report on commits whose task tag sorts at or after this id.",
     )
+    parser.add_argument(
+        "--first-parent",
+        action="store_true",
+        help="Follow only the first parent commit upon seeing a merge commit.",
+    )
     args = parser.parse_args(argv)
 
-    rc, log = git("log", "--no-merges", "--format=%H", args.rev_range)
+    cmd = ["log", "--format=%H"]
+    if args.first_parent:
+        cmd.append("--first-parent")
+    else:
+        cmd.append("--no-merges")
+    cmd.append(args.rev_range)
+
+    rc, log = git(*cmd)
     if rc != 0:
         print(f"audit-commits: cannot walk {args.rev_range}", file=sys.stderr)
         return 2

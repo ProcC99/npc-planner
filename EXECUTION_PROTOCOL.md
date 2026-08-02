@@ -568,6 +568,10 @@ Widening a parser, guard, scope, or fixture so that a previously-failing check p
 
 `tests/fixtures/fake_rom/` is a faithful miniature of upstream. Every record in it must be something the real ROM could contain — real field names, real symbol names, realistic values, correct macro conventions (`COMPOUND_STRING` for moves, `_()` for species). Synthetic edge cases — missing keys, malformed values, unresolved expressions, fictional field names — belong in **inline fixture strings** inside the unit test that needs them, never in `fake_rom/`. If `audit_*_coverage` against `fake_rom` returns a clean bill, it must mean the fixture genuinely exercises the parser against realistic data, not that the parser was widened to match fiction.
 
+### 11.17 Verified reporting
+
+No field in any execution note or review report (including test result counts, workflow run links, and coverage summaries) may be filled by inference, extrapolation, or prediction. Every field must be copied directly from output captured from a command invocation performed in that step. If an output field cannot be populated from actual command output, it must be stated as `unverified`. Fabricating status, links, or counts reopens the task immediately and invalidates all downstream artifacts depending on it.
+
 ---
 
 ## Appendix A — Task Count Estimate
