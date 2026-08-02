@@ -2,7 +2,7 @@ name: gate
 
 on:
   push:
-    branches: [main, "milestone/**"]
+    branches: ["milestone/**"]
   pull_request:
 
 jobs:
@@ -23,17 +23,21 @@ jobs:
       - name: Install hooks
         run: make hooks
       - name: Fetch integration branch ref
-        run: git fetch origin '+refs/heads/milestone/*:refs/heads/milestone/*' || true
+        run: |
+          git fetch origin '+refs/heads/milestone/*:refs/heads/milestone/*' || true
+          git fetch origin main:main || true
+          git fetch origin --tags --force || true
       - name: Gate
         run: make gate
       - name: Acceptance suites
         run: |
           for s in scripts/accept/M1-T11.sh scripts/accept/M1-T11b.sh scripts/accept/M1-T11c.sh scripts/accept/M1-T12.sh scripts/accept/M1-T12b.sh scripts/accept/M1-T12d.sh scripts/accept/M1-T12e.sh scripts/accept/M1-T12f.sh; do
             echo "=== RUNNING $s ==="
-            if ! bash "$s"; then
-              echo "!!! SCRIPT FAILED: $s with exit code $? !!!"
-              exit 1
+            bash "$s"; rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "!!! FAILED: $s rc=$rc !!!"
+              exit "$rc"
             fi
           done
       - name: Commit audit
-        run: python3 scripts/audit_commits.py --range milestone/M1 --first-parent
+        run: python3 scripts/audit_commits.py --range main..HEAD --first-parent

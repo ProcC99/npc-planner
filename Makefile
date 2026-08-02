@@ -61,4 +61,4 @@ golden-update:
 	@echo "Now review 'git diff tests/golden' line by line before committing."
 
 hooks:
-	python3 -m pre_commit install --hook-type pre-commit --hook-type commit-msg
+	python3 -m pre_commit install --install-hooks --hook-type pre-commit --hook-type commit-msg
