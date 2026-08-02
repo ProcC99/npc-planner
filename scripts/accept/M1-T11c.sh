@@ -106,9 +106,12 @@ expect_exit 0 audit_tests "${PY}" -m pytest tests/unit/test_audit_commits.py -q
 
 # ----------------------------------------------------------- card intact ----
 
-CARD_COMMIT="$(git log --format=%H -1 milestone/M1 -- docs/tasks/M1-T11c.md)"
+CARD_COMMIT="$(git log --reverse --format=%H milestone/M1 -- docs/tasks/M1-T11c.md | head -1)"
 expect_no_stdout "M1-T11c.md" card_unmodified_since \
   bash -c 'git diff --name-only '"${CARD_COMMIT}"'..HEAD -- docs/tasks/M1-T11c.md'
+
+expect_exit 0 card_not_touched_after_branch \
+  bash -c '[ "$(git rev-list --count "$(git merge-base milestone/M1 HEAD)"..HEAD -- docs/tasks/M1-T11c.md)" = "0" ]'
 
 expect_stdout "ok" accept_scripts_parse \
   bash -c 'for f in scripts/accept/*.sh; do bash -n "$f" || exit 1; done; echo ok'

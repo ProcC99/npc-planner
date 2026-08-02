@@ -36,6 +36,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T11b | done | 370fe82 | check ✅ | re-source coverage guard, capture required species fields, self-gating guard protection |
 | M1-T11c | done | 9acc29e | check ✅ | record symbol values in unparsed_fields and fix acceptance probes |
 | M1-T12 | done | b384966 | check ✅ | moves extractor & ingest protocol refactoring |
+| M1-T12b | todo | — | — | fix fixture fidelity, CExpr, COMPOUND_STRING name extraction, protocol §11.15/§11.16 |
 | M1-T13 | todo | — | — | `ingest/extract/abilities.py`: abilities extractor |
 | M1-T14 | todo | — | — | `ingest/extract/types.py`: types and matchup-matrix extractor |
 | M1-T15 | todo | — | — | `ingest/extract/learnsets_levelup.py`: level-up learnset extractor |
@@ -72,5 +73,6 @@ Per Amendment 11, history is not rewritten; violations are recorded here for tra
 - `052b862`: untagged commit (`fixup! add M1-T08e card`)
 - `7d22d8f` (M1-T08e): tag reused after task recorded done in ledger (tag-shopping, not malice)
 - `737dc19` (M1-T08e): tag reused after task recorded done in ledger (tag-shopping, not malice)
+- `401de73` (M1-T12): card `docs/tasks/M1-T12.md` mutated after initial commit — `.split` → `.category` rename was a fixture fidelity violation (remediated in M1-T12b)
 
 - 2026-08-01 [ci]: added `scripts/review_bundle.sh` and `review-bundle` Makefile target per M1-T11 Step 0b.

@@ -91,6 +91,10 @@ CARD_COMMIT="$(git log --format=%H -1 milestone/M1 -- docs/tasks/M1-T12.md)"
 expect_no_stdout "M1-T12.md" card_unmodified_since \
   bash -c 'git diff --name-only '"${CARD_COMMIT}"'..HEAD -- docs/tasks/M1-T12.md'
 
+# M1-T12 card was mutated by commit 401de73; that sha must appear in audit_commits.py
+expect_stdout "401de73" card_mutation_in_audit \
+  bash -c 'grep 401de73 scripts/audit_commits.py'
+
 expect_stdout "ok" accept_scripts_parse \
   bash -c 'for f in scripts/accept/*.sh; do bash -n "$f" || exit 1; done; echo ok'
 

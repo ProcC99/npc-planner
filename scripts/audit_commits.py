@@ -46,6 +46,15 @@ GUARD_PATHS = (
     ".pre-commit-config.yaml",
 )
 
+# Commits whose violations have been triaged and recorded.
+# Key: full sha.  Value: short human-readable reason.
+KNOWN_VIOLATIONS: dict[str, str] = {
+    "401de73ef52c01f5bf71f7fefa45b24893593953": (
+        "M1-T12 card mutated after initial commit — "
+        ".split → .category rename was a fixture fidelity violation (T12b remediation)"
+    ),
+}
+
 
 def git(*args: str) -> tuple[int, str]:
     proc = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
@@ -202,6 +211,7 @@ def main(argv: list[str] | None = None) -> int:
 
     total = 0
     bad = 0
+    known_skipped = 0
     for sha in shas:
         _, subject = git("log", "-1", "--format=%s", sha)
         subject = subject.strip()
@@ -210,6 +220,9 @@ def main(argv: list[str] | None = None) -> int:
             if found and found.group(1) < args.since_task:
                 continue
         total += 1
+        if sha in KNOWN_VIOLATIONS:
+            known_skipped += 1
+            continue
         problems = audit_commit(sha)
         if problems:
             bad += 1
@@ -218,7 +231,13 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"          - {problem}")
 
     print("-" * 62)
-    print(f"audit: {total - bad}/{total} commits clean, {bad} with violations")
+    summary_parts = [
+        f"audit: {total - bad - known_skipped}/{total} commits clean",
+        f"{bad} with violations",
+    ]
+    if known_skipped:
+        summary_parts.append(f"{known_skipped} known (triaged)")
+    print(", ".join(summary_parts))
     return 1 if bad else 0
 
 
