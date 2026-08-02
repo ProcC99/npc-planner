@@ -218,10 +218,7 @@ def test_7_coverage_audit_fake_rom(fake_rom_layout: object) -> None:
     text = path.read_text(encoding="utf-8")
     records = parse_moves(text, str(path))
     uncovered = audit_moves_coverage(text, records)
-    # The regex picks up .moveEffect and .chance from inside ADDITIONAL_EFFECTS({})
-    # which are nested macro args, not top-level initializer keys. These are
-    # false positives from the flat regex — acceptable for now.
-    assert set(uncovered) <= {"chance", "moveEffect"}
+    assert uncovered == ()
 
 
 def test_8_coverage_audit_detects_uncovered_key() -> None:

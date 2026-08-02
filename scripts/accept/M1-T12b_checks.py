@@ -114,9 +114,7 @@ def probe_coverage_audit() -> str:
     path = FIXTURE / "src" / "data" / "moves_info.h"
     text = path.read_text(encoding="utf-8")
     uncovered = audit_moves_coverage(text, records)
-    # moveEffect and chance are false positives from ADDITIONAL_EFFECTS nesting
-    real_uncovered = [k for k in uncovered if k not in ("moveEffect", "chance")]
-    return f"uncovered={real_uncovered}"
+    return f"uncovered={list(uncovered)}"
 
 
 def probe_duplicate_key_detection() -> str:

@@ -154,15 +154,9 @@ def parse_moves(text: str, source_file: str) -> tuple[MoveRecord, ...]:
             move_name = rom_id.removeprefix("MOVE_").replace("_", " ").title()
 
         # Type, Effect, Target — all str | None with CExpr routing
-        move_type = _parse_str_or_expr(
-            raw_dict.get("type", "TYPE_NONE"), "type", unevaluated_list
-        )
-        effect = _parse_str_or_expr(
-            raw_dict.get("effect", "EFFECT_HIT"), "effect", unevaluated_list
-        )
-        target = _parse_str_or_expr(
-            raw_dict.get("target", "TARGET_SELECTED"), "target", unevaluated_list
-        )
+        move_type = _parse_str_or_expr(raw_dict.get("type"), "type", unevaluated_list)
+        effect = _parse_str_or_expr(raw_dict.get("effect"), "effect", unevaluated_list)
+        target = _parse_str_or_expr(raw_dict.get("target"), "target", unevaluated_list)
 
         # Power, Accuracy, PP, Priority
         power = _parse_int_or_symbol(
@@ -227,7 +221,11 @@ def audit_moves_coverage(
     text: str,
     records: Sequence[MoveRecord],
 ) -> tuple[str, ...]:
-    raw_keys_in_text: set[str] = set(re.findall(r"\.([A-Za-z0-9_]+)\s*=", text))
+    # Extract field keys that appear at top-level within record initializer blocks `.key =`
+    # (indented by 4 to 8 spaces, avoiding nested keys like .moveEffect indented deeper inside ADDITIONAL_EFFECTS)
+    raw_keys_in_text: set[str] = set(
+        re.findall(r"^\s{4,8}\.([A-Za-z0-9_]+)\s*=", text, flags=re.MULTILINE)
+    )
     unparsed_in_records: set[str] = {k for r in records for k in r.unparsed_fields}
     symbolic_keys_in_records: set[str] = {k for r in records for k in r.symbolic_map}
     unevaluated_keys_in_records: set[str] = {

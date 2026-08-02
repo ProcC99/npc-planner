@@ -43,8 +43,13 @@ class CExpr:
 
 
 def _strip_comments_and_line_directives(text: str) -> str:
-    """Strip C comments (/* ... */, // ...) and #line directives."""
-    text = re.sub(r"^\s*#line.*$", "", text, flags=re.MULTILINE)
+    """Strip C comments (/* ... */, // ...), #line directives, and #if preprocessor directives."""
+    text = re.sub(
+        r"^\s*#(?:line|if|elif|else|endif|ifdef|ifndef)\b.*$",
+        "",
+        text,
+        flags=re.MULTILINE,
+    )
     text = re.sub(r"/\*[\s\S]*?\*/", "", text)
     text = re.sub(r"//.*$", "", text, flags=re.MULTILINE)
     return text
