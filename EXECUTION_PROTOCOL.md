@@ -20,6 +20,7 @@ These exist because they are the specific ways a cheap model destroys a codebase
 6. **Never invent an API.** If you do not know a library's signature, check the installed package or the docs. Do not guess a `pydantic` or `typer` call and hope.
 7. **Never mark a task complete with a failing or skipped check.** `make check` green is the only definition of done.
 8. **One task, one commit, one green check.** Do not batch.
+9. **The agent MUST NOT create, modify, or chmod any file outside the repository working tree.** Remote authentication is configured with repository-local `git config --local core.sshCommand`, never with a global or user-level file. No hook can enforce this; it holds by construction. If a task appears to require a change outside the working tree, STOP and report `OUT_OF_TREE_CHANGE_REQUIRED`.
 
 ---
 
