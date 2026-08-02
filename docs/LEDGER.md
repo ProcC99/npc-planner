@@ -39,6 +39,7 @@ minutes of human time. A guess costs a day of debugging three milestones later.
 | M1-T12b | done | ec8d14d | check ✅ | fix fixture fidelity, CExpr, COMPOUND_STRING name extraction, protocol §11.15/§11.16 |
 | M1-T00c | done | 9557ba6 | check ✅ | publish repository to GitHub, CI gate workflow, issue trace |
 | M1-T12c | done | 61bf8a4 | check ✅ | drop fabricated defaults, C preprocessor conditionals in initializers, coverage audit regex |
+| M1-T12d | done | 372eb9a | check ✅ | fix CI branch filter, revert preprocessor strip, restore T12b checks, fix test_hooks python path |
 | M1-T13 | todo | — | — | `ingest/extract/abilities.py`: abilities extractor |
 | M1-T14 | todo | — | — | `ingest/extract/types.py`: types and matchup-matrix extractor |
 | M1-T15 | todo | — | — | `ingest/extract/learnsets_levelup.py`: level-up learnset extractor |

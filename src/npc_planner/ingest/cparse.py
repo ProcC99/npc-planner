@@ -43,13 +43,8 @@ class CExpr:
 
 
 def _strip_comments_and_line_directives(text: str) -> str:
-    """Strip C comments (/* ... */, // ...), #line directives, and #if preprocessor directives."""
-    text = re.sub(
-        r"^\s*#(?:line|if|elif|else|endif|ifdef|ifndef)\b.*$",
-        "",
-        text,
-        flags=re.MULTILINE,
-    )
+    """Strip C comments (/* ... */, // ...) and #line directives."""
+    text = re.sub(r"^\s*#line.*$", "", text, flags=re.MULTILINE)
     text = re.sub(r"/\*[\s\S]*?\*/", "", text)
     text = re.sub(r"//.*$", "", text, flags=re.MULTILINE)
     return text
@@ -64,11 +59,25 @@ def _clean_string_literal(val: str) -> str:
     return val.strip()
 
 
+def _check_no_preprocessor_conditionals(text: str, symbol: str) -> None:
+    """Raise CParseError if preprocessor conditional directives appear in text."""
+    match = re.search(
+        r"^\s*#(?:if|ifdef|ifndef|elif|else|endif)\b", text, flags=re.MULTILINE
+    )
+    if match:
+        line_no = text[: match.start()].count("\n") + 1
+        directive = match.group(0).strip()
+        raise CParseError(
+            f"C preprocessor conditional directive '{directive}' inside initializer for '{symbol}' at line {line_no}. "
+            "Evaluated conditional parsing is required."
+        )
+
+
 def parse_array_initializer(text: str, symbol: str) -> dict[str, dict[str, CValue]]:
     """Extract `TYPE symbol[] = { [KEY] = { .field = value, ... }, ... };` from text.
 
     Returns a mapping of KEY (as written, e.g. "SPECIES_SKARMORY") to a field dict.
-    Raises CParseError if `symbol` is absent or braces are unbalanced.
+    Raises CParseError if `symbol` is absent, braces are unbalanced, or preprocessor directives are found.
     """
     clean_text = _strip_comments_and_line_directives(text)
 
@@ -216,10 +225,18 @@ def _parse_c_value(text: str, start: int) -> tuple[CValue, int]:
     return CExpr(raw=token, identifiers=idents), i
 
 
-def _parse_inner_braces(inner: str) -> dict[str, CValue] | list[CValue]:
-    """Parse inner content of braces into dict (keyed) or list (positional)."""
+def _parse_inner_braces(
+    inner: str, symbol: str = "<entry>"
+) -> dict[str, CValue] | list[CValue]:
+    """Parse inner content of braces into dict (keyed) or list (positional).
+
+    Raises CParseError if a preprocessor conditional directive appears inside the
+    entry body — these indicate conditional field values that cannot be parsed
+    without evaluating the preprocessor.
+    """
     if not inner:
         return {}
+    _check_no_preprocessor_conditionals(inner, symbol)
 
     field_matches: list[tuple[str, int, int]] = []
     i = 0
