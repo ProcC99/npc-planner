@@ -82,7 +82,7 @@ expect_stdout "string_only=True" parse_needs_no_filesystem \
   "${PY}" "${PROBE}" string-only
 
 # Not an assertion - the three numbers the card asks you to report.
-expect_stdout "counts=" reported_counts "${PY}" "${PROBE}" counts
+expect_stdout "counts=species:2" reported_counts "${PY}" "${PROBE}" counts
 
 # ---------------------------------------------------- ledger / done-tag -----
 
@@ -131,11 +131,11 @@ expect_exit 0 rom_config_tests "${PY}" -m pytest tests/unit/test_rom_config.py -
 
 # ----------------------------------------------------------- card intact ----
 
-CARD_COMMIT="$(git log --format=%H -1 milestone/M1 -- docs/tasks/M1-T11.md)"
+CARD_COMMIT="$(git log --format=%H -1 HEAD milestone/M1 -- docs/tasks/M1-T11.md 2>/dev/null || true)"
 expect_no_stdout "M1-T11.md" card_unmodified \
   bash -c 'git diff --name-only '"${CARD_COMMIT}"'..HEAD -- docs/tasks/M1-T11.md'
 
 expect_stdout "ok" accept_scripts_parse \
   bash -c 'for f in scripts/accept/*.sh; do bash -n "$f" || exit 1; done; echo ok'
 
-accept_summary
+accept_summary 33

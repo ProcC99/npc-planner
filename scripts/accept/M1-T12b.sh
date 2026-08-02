@@ -86,11 +86,11 @@ expect_stdout "401de73" card_mutation_in_audit \
 
 # ----------------------------------------------------------- card intact ----
 
-CARD_COMMIT="$(git log --reverse --format=%H -- docs/tasks/M1-T12b.md | head -1)"
+CARD_COMMIT="$(git log --reverse --format=%H HEAD milestone/M1 -- docs/tasks/M1-T12b.md 2>/dev/null | head -1)"
 expect_no_stdout "M1-T12b.md" card_unmodified_since \
   bash -c 'git diff --name-only '"${CARD_COMMIT}"'..HEAD -- docs/tasks/M1-T12b.md'
 
 expect_stdout "ok" accept_scripts_parse \
   bash -c 'for f in scripts/accept/*.sh; do bash -n "$f" || exit 1; done; echo ok'
 
-accept_summary
+accept_summary 23

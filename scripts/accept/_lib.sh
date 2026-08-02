@@ -84,9 +84,14 @@ expect_no_stdout() {
 }
 
 accept_summary() {
+    local expected="${1:-0}"
     local total=$((_ACCEPT_PASS + _ACCEPT_FAIL))
     printf -- '----------------------------------------------------------\n'
     printf 'acceptance: %d/%d passed, %d failed\n' "$_ACCEPT_PASS" "$total" "$_ACCEPT_FAIL"
+    if [ "$expected" -gt 0 ] && [ "$_ACCEPT_PASS" -ne "$expected" ]; then
+        printf 'FAIL  expected %d passed checks, but got %d\n' "$expected" "$_ACCEPT_PASS"
+        return 1
+    fi
     if [ "$_ACCEPT_FAIL" -ne 0 ]; then
         return 1
     fi

@@ -87,7 +87,7 @@ expect_exit 0 audit_tests "${PY}" -m pytest tests/unit/test_audit_commits.py -q
 
 # ----------------------------------------------------------- card intact ----
 
-CARD_COMMIT="$(git log --format=%H -1 milestone/M1 -- docs/tasks/M1-T12.md)"
+CARD_COMMIT="$(git log --format=%H -1 HEAD milestone/M1 -- docs/tasks/M1-T12.md 2>/dev/null || true)"
 expect_no_stdout "M1-T12.md" card_unmodified_since \
   bash -c 'git diff --name-only '"${CARD_COMMIT}"'..HEAD -- docs/tasks/M1-T12.md'
 

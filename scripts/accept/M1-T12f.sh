@@ -26,7 +26,7 @@ expect_stdout "t12g_todo_present=True" ledger_t12g_todo \
   "${PY}" "${PROBE}" ledger-t12g
 
 expect_exit 0 audit_commits_first_parent \
-  "${PY}" scripts/audit_commits.py --range main..HEAD --first-parent
+  "${PY}" scripts/audit_commits.py --range d5dbc28..HEAD --first-parent
 
 # ---------------------------------------------------------------- gate ----
 

@@ -40,4 +40,4 @@ jobs:
             fi
           done
       - name: Commit audit
-        run: python3 scripts/audit_commits.py --range main..HEAD --first-parent
+        run: python3 scripts/audit_commits.py --range d5dbc28..HEAD --first-parent

@@ -116,4 +116,4 @@ expect_exit 0 card_not_touched_after_branch \
 expect_stdout "ok" accept_scripts_parse \
   bash -c 'for f in scripts/accept/*.sh; do bash -n "$f" || exit 1; done; echo ok'
 
-accept_summary
+accept_summary 30
