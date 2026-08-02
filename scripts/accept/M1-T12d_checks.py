@@ -19,7 +19,9 @@ def probe_ci_branch_filter() -> str:
     """gate.yml triggers on milestone/** branch pushes."""
     gate_yml = REPO / ".github" / "workflows" / "gate.yml"
     text = gate_yml.read_text(encoding="utf-8")
-    is_valid = 'branches: [main, "milestone/**"]' in text
+    is_valid = ('branches: [main, "milestone/**"]' in text) or (
+        'branches: ["milestone/**"]' in text
+    )
     return f"filter_valid={is_valid}"
 
 
