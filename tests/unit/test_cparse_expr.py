@@ -98,15 +98,9 @@ const int arr[] = {
         .name = 1,
 #if B_EXPANSION >= GEN_6
         .power = 90,
-#else
-        .accuracy = 100,
 #endif
     },
 };
 """
-    # Strips #if/#else/#endif lines so duplicate key check or parsing won't break
-    res = parse_array_initializer(text, "arr")
-    assert "FOO" in res
-    assert res["FOO"]["name"] == 1
-    assert res["FOO"]["power"] == 90
-    assert res["FOO"]["accuracy"] == 100
+    with pytest.raises(CParseError, match="C preprocessor conditional directive '#if'"):
+        parse_array_initializer(text, "arr")
